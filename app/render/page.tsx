@@ -44,7 +44,7 @@ function RenderContent() {
   const [brushSize, setBrushSize] = useState(10);
 
   // Sticker Feature Logic
-  const [activeMode, setActiveMode] = useState<"draw" | "sticker">("draw");
+  const [activeMode, setActiveMode] = useState<"draw" | "sticker">("sticker");
   const [stickersList, setStickersList] = useState<any[]>([]);
   const [placedStickers, setPlacedStickers] = useState<any[]>([]);
   const [selectedStickerId, setSelectedStickerId] = useState<string | null>(null);
@@ -297,7 +297,7 @@ function RenderContent() {
         url: `/api/image-proxy?url=${encodeURIComponent(fullPath)}`,
         x: dim.w / 2, // center
         y: dim.h / 2, // center
-        scale: 1,
+        scale: 1.25,
         rotation: 0,
       }
     ]);
@@ -490,7 +490,7 @@ function RenderContent() {
             ctx.translate(st.x, st.y);
             ctx.rotate((st.rotation * Math.PI) / 180);
             ctx.scale(st.scale, st.scale);
-            const drawW = 200;
+            const drawW = 300;
             const drawH = (200 / img.width) * img.height;
             ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
             ctx.restore();
@@ -607,7 +607,7 @@ function RenderContent() {
               ctx.translate(st.x, st.y);
               ctx.rotate((st.rotation * Math.PI) / 180);
               ctx.scale(st.scale, st.scale);
-              const drawW = 200;
+              const drawW = 300;
               const drawH = (200 / img.width) * img.height;
               ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
               ctx.restore();
@@ -645,7 +645,7 @@ function RenderContent() {
 
   return (
     <div
-      className="relative h-screen w-full overflow-hidden bg-[#f15a09] font-sans text-slate-900 flex flex-col p-4"
+      className="relative h-screen w-full overflow-hidden bg-[#f15a09] font-sans text-slate-900 flex flex-col p-2 sm:p-3"
       onMouseMove={onPointerMove}
       onMouseUp={onPointerUp}
       onMouseLeave={onPointerUp}
@@ -653,27 +653,32 @@ function RenderContent() {
       onTouchEnd={onPointerUp}
       onTouchCancel={onPointerUp}
     >
-      <div className="relative flex-1 flex flex-col border-[4px] border-white rounded-[30px] overflow-hidden bg-[#f15a09]">
+      <div className="relative flex-1 flex flex-col border-[4px] border-white rounded-[30px] overflow-hidden bg-[#f15a09] min-h-0">
         
-        {/* Header Title & Timer Badge */}
-        <header className="relative z-10 flex items-center justify-between px-6 py-3 shrink-0 h-14">
-          <h2 className={`${mochiyPopOne.className} text-white text-xl uppercase tracking-widest drop-shadow-md`}>
+        <header className="relative z-10 flex items-center justify-between px-5 py-2 shrink-0">
+          <h2 className={`${mochiyPopOne.className} text-white text-base sm:text-lg uppercase tracking-widest drop-shadow-md`}>
             PERSONALISASI
           </h2>
 
-          <div className="flex items-center gap-3 bg-white/20 backdrop-blur-xl px-6 py-2 rounded-full border border-white/40 shadow-lg">
+          <div className="flex items-center gap-2 bg-white/20 backdrop-blur-xl px-4 py-1.5 rounded-full border border-white/40 shadow-lg">
              <div className={`w-2 h-2 rounded-full bg-white ${timeLeft <= 20 ? 'animate-ping' : 'animate-pulse'}`}></div>
-             <span className="text-white font-black tabular-nums tracking-widest text-lg">
+             <span className="text-white font-black tabular-nums tracking-widest text-base">
                {formatTime(timeLeft)}
              </span>
           </div>
         </header>
 
-        {/* Content Area */}
-        <main className="flex-1 flex flex-col gap-4 px-4 pb-4 overflow-hidden">
-          
-          {/* Main Workspace (Preview + Doodle + Stickers) */}
-          <div className="flex-[1.2] bg-white rounded-[24px] shadow-2xl relative overflow-hidden border-3 border-white flex flex-col shrink-0">
+        <main className="flex-1 flex flex-col gap-3 px-4 pb-3 min-h-0 overflow-hidden">
+
+          <div className="flex-1 flex flex-row gap-4 min-h-0 overflow-hidden">
+
+            <div className="flex-[1.65] flex flex-col min-h-0 min-w-0 gap-2">
+
+              <h2 className={`${mochiyPopOne.className} text-white text-sm uppercase tracking-widest text-center shrink-0 drop-shadow-md`}>
+                HASIL FOTO
+              </h2>
+
+          <div className="flex-1 min-h-0 bg-white rounded-[20px] shadow-2xl relative overflow-hidden border-3 border-white flex flex-col">
             
             <div 
               ref={containerRef}
@@ -694,7 +699,7 @@ function RenderContent() {
                         style={{
                           left: st.x,
                           top: st.y,
-                          width: Math.max(200 * st.scale, 80),
+                          width: Math.max(300 * st.scale, 120),
                           transform: `translate(-50%, -50%) rotate(${st.rotation}deg)`,
                         }}
                         onMouseDown={(e) => onStickerPointerDown(e, st.id, 'move')}
@@ -734,49 +739,58 @@ function RenderContent() {
             </div>
           </div>
 
-          {/* Sidebar Tools (Bawah) */}
-          <div className="flex-[0.8] bg-white rounded-[24px] shadow-2xl p-4 flex flex-col gap-4 overflow-y-auto border-3 border-white custom-scrollbar min-h-0 shrink-0">
+            </div>
+
+
+
+            <div className="flex-1 flex flex-col min-h-0 min-w-0 gap-2">
+
+              <h2 className={`${mochiyPopOne.className} text-white text-sm uppercase tracking-widest text-center shrink-0 drop-shadow-md`}>
+                ALAT EDIT
+              </h2>
+
+          <div className="flex-1 min-h-0 bg-white rounded-[20px] shadow-2xl p-3 flex flex-col gap-3 overflow-y-auto border-3 border-white custom-scrollbar">
              
              {/* Mode Selector Header Inside Sidebar */}
-             <div className="bg-slate-50 p-1.5 rounded-full flex gap-1 mb-2 border border-slate-100 shadow-inner shrink-0 max-w-sm mx-auto w-full">
+             <div className="bg-slate-50 p-1 rounded-full flex gap-1 border border-slate-100 shadow-inner shrink-0 w-full">
                 <button 
                   onClick={() => setActiveMode("draw")}
-                  className={`flex-1 py-3 rounded-full font-black text-[10px] tracking-widest transition-all uppercase ${activeMode === "draw" ? "bg-[#f15a09] text-white shadow-lg" : "text-slate-400 hover:text-[#f15a09]"}`}
+                  className={`flex-1 py-2 rounded-full font-black text-[9px] tracking-widest transition-all uppercase ${activeMode === "draw" ? "bg-[#f15a09] text-white shadow-lg" : "text-slate-400 hover:text-[#f15a09]"}`}
                 >
                   CORETAN
                 </button>
                 <button 
                   onClick={() => setActiveMode("sticker")}
-                  className={`flex-1 py-3 rounded-full font-black text-[10px] tracking-widest transition-all uppercase ${activeMode === "sticker" ? "bg-[#f15a09] text-white shadow-lg" : "text-slate-400 hover:text-[#f15a09]"}`}
+                  className={`flex-1 py-2 rounded-full font-black text-[9px] tracking-widest transition-all uppercase ${activeMode === "sticker" ? "bg-[#f15a09] text-white shadow-lg" : "text-slate-400 hover:text-[#f15a09]"}`}
                 >
                   STIKER
                 </button>
              </div>
 
              {activeMode === "draw" ? (
-               <div className="flex flex-col flex-1 gap-4 animate-in slide-in-from-bottom-10 duration-500 max-w-lg mx-auto w-full">
-                  <h4 className={`${mochiyPopOne.className} text-[#f15a09] text-sm uppercase text-center tracking-widest`}>PILIH WARNA</h4>
-                  <div className="flex flex-wrap justify-center gap-3">
+               <div className="flex flex-col flex-1 gap-3 animate-in slide-in-from-bottom-10 duration-500 w-full min-h-0">
+                  <h4 className={`${mochiyPopOne.className} text-[#f15a09] text-[10px] uppercase tracking-widest`}>PILIH WARNA</h4>
+                  <div className="flex flex-wrap gap-2">
                     {colors.map(c => (
                       <button 
                         key={c} 
                         onClick={() => setColor(c)} 
-                        className={`w-14 h-14 rounded-3xl transition-all duration-300 border-4 shadow-sm ${color === c ? "border-[#f15a09] scale-110 shadow-orange-100" : "border-slate-50 opacity-80"}`}
+                        className={`w-9 h-9 rounded-full transition-all duration-300 border-3 shadow-sm ${color === c ? "border-[#f15a09] scale-110 shadow-orange-100" : "border-slate-50 opacity-80"}`}
                         style={{ backgroundColor: c }}
                       />
                     ))}
                   </div>
 
-                  <h4 className={`${mochiyPopOne.className} text-[#f15a09] text-xs uppercase text-center tracking-widest mt-2`}>UKURAN KUAS</h4>
-                  <div className="flex justify-center gap-6">
+                  <h4 className={`${mochiyPopOne.className} text-[#f15a09] text-[10px] uppercase tracking-widest`}>UKURAN KUAS</h4>
+                  <div className="flex gap-3">
                     {[6, 12, 24].map(size => (
-                      <button key={size} onClick={() => setBrushSize(size)} className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${brushSize === size ? "bg-orange-50 text-[#f15a09] border-4 border-[#f15a09]" : "bg-slate-50 text-slate-300 border-4 border-slate-50"}`}>
+                      <button key={size} onClick={() => setBrushSize(size)} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${brushSize === size ? "bg-orange-50 text-[#f15a09] border-3 border-[#f15a09]" : "bg-slate-50 text-slate-300 border-3 border-slate-50"}`}>
                         <div className="bg-current rounded-full" style={{ width: size/2 + 'px', height: size/2 + 'px' }} />
                       </button>
                     ))}
                   </div>
 
-                  <div className="mt-auto grid grid-cols-2 gap-4 pt-2">
+                  <div className="mt-auto grid grid-cols-2 gap-2 pt-1">
                     <button onClick={handleUndo} disabled={history.length <= 1} className="py-3 bg-slate-50 text-slate-400 rounded-2xl font-black text-xs uppercase tracking-widest border-2 border-slate-100 disabled:opacity-30 flex flex-col items-center gap-1 hover:bg-slate-100 transition-colors">
                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
                        UNDO
@@ -788,9 +802,9 @@ function RenderContent() {
                   </div>
                </div>
              ) : (
-               <div className="flex flex-col flex-1 gap-4 animate-in slide-in-from-bottom-10 duration-500 max-w-lg mx-auto w-full">
-                  <h4 className={`${mochiyPopOne.className} text-[#f15a09] text-sm uppercase text-center tracking-widest`}>KOLEKSI STIKER</h4>
-                  <div className="flex-1 overflow-y-auto grid grid-cols-4 sm:grid-cols-5 gap-3 custom-scrollbar" style={{ scrollbarWidth: "none" }}>
+               <div className="flex flex-col flex-1 gap-3 animate-in slide-in-from-bottom-10 duration-500 w-full min-h-0">
+                  <h4 className={`${mochiyPopOne.className} text-[#f15a09] text-[10px] uppercase tracking-widest`}>KOLEKSI STIKER</h4>
+                  <div className="flex-1 overflow-y-auto grid grid-cols-2 gap-3 custom-scrollbar min-h-0" style={{ scrollbarWidth: "none" }}>
                     {stickersList.map((st) => {
                       let fullPath = st.image_path;
                       if (!fullPath.startsWith('http')) {
@@ -801,7 +815,7 @@ function RenderContent() {
                       const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(fullPath)}`;
                       return (
                         <img key={st.id} src={proxyUrl} alt={st.name} onClick={() => addSticker(st)}
-                          className="w-full h-20 object-contain bg-slate-50 border-4 border-white rounded-2xl p-2 cursor-pointer shadow-sm hover:border-[#f15a09] transition-all active:scale-95" />
+                          className="w-full h-28 object-contain bg-slate-50 border-4 border-white rounded-2xl p-2 cursor-pointer shadow-sm hover:border-[#f15a09] transition-all active:scale-95" />
                       );
                     })}
                   </div>
@@ -814,9 +828,14 @@ function RenderContent() {
                </div>
              )}
           </div>
+
+            </div>
+
+          </div>
+
         </main>
 
-        <footer className="h-20 flex items-center justify-center gap-3 px-6 pb-4">
+        <footer className="shrink-0 flex items-center justify-center gap-3 px-6 py-3">
            <button
              onClick={() => {
                const storedTemplatesJSON = localStorage.getItem("templates");
@@ -828,7 +847,7 @@ function RenderContent() {
                }
                router.push(`/camera?kanvas=${canvasType}&template=${templateId}&frames=${frameCount}&time=${timeLeft}`);
              }}
-             className="rounded-full border-2 border-white px-8 py-3 text-xs font-black uppercase tracking-widest text-white transition-colors hover:bg-white/10"
+             className="rounded-full border-2 border-white px-6 py-2.5 text-xs font-black uppercase tracking-widest text-white transition-colors hover:bg-white/10"
            >
              FOTO ULANG
            </button>
@@ -839,7 +858,7 @@ function RenderContent() {
                handleFinish();
              }}
              disabled={isRenderingVideo}
-             className="rounded-full bg-white px-12 py-3 text-lg font-black uppercase tracking-widest text-[#f15a09] shadow-xl transition-transform hover:scale-[1.03] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-70 select-none"
+             className="rounded-full bg-white px-10 py-2.5 text-sm font-black uppercase tracking-widest text-[#f15a09] shadow-xl transition-transform hover:scale-[1.03] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-70 select-none"
            >
              {isRenderingVideo ? "SEDANG MERENDER..." : "LANJUT CETAK"}
            </button>

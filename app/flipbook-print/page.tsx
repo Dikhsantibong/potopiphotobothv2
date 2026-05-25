@@ -871,14 +871,12 @@ function FlipbookPrintContent() {
   }
 
   return (
-    <div className="relative h-screen w-full overflow-hidden bg-[#f15a09] font-sans text-slate-900 flex flex-col p-4">
+    <div className="relative h-screen w-full overflow-hidden bg-[#f15a09] font-sans text-slate-900 flex flex-col p-2 sm:p-3">
 
-      {/* Container Frame */}
-      <div className="relative flex-1 flex flex-col border-[4px] border-white rounded-[30px] overflow-hidden bg-[#f15a09]">
+      <div className="relative flex-1 flex flex-col border-[4px] border-white rounded-[30px] overflow-hidden bg-[#f15a09] min-h-0">
 
-        {/* Header */}
-        <header className="px-6 py-3 flex items-center justify-between shrink-0">
-          <h1 className={`${mochiyPopOne.className} text-white text-3xl uppercase tracking-widest drop-shadow-md`}>CETAK FLIPBOOK</h1>
+        <header className="px-5 py-2 flex items-center justify-between shrink-0">
+          <h1 className={`${mochiyPopOne.className} text-white text-base sm:text-lg uppercase tracking-widest drop-shadow-md`}>CETAK FLIPBOOK</h1>
           <div className="flex items-center gap-3">
             {printGenStage !== "idle" && printGenStage !== "done" && (
               <div className="flex items-center gap-2 bg-white/20 px-5 py-2 rounded-full border border-white/40 text-white">
@@ -887,19 +885,25 @@ function FlipbookPrintContent() {
               </div>
             )}
             {isPrintSheetsReady && (
-              <div className="bg-white/20 px-6 py-2 rounded-full border border-white/40 text-white font-black text-sm tracking-widest">
+              <div className="bg-white/20 px-4 py-1.5 rounded-full border border-white/40 text-white font-black text-xs sm:text-sm tracking-widest">
                 {printSheets.length} LEMBAR SIAP
               </div>
             )}
           </div>
         </header>
 
-        {/* Content Stacked for Portrait */}
-        <main className="flex-1 flex flex-col gap-4 px-4 pb-4 overflow-hidden items-stretch">
+        <main className="flex-1 flex flex-col gap-3 px-4 pb-3 min-h-0 overflow-hidden items-stretch">
 
-          {/* Top Panel: Cover & Print Sheet Preview */}
-          <div className="flex-[1.2] bg-white rounded-[24px] shadow-2xl flex flex-col p-4 overflow-hidden border-3 border-white relative shrink-0">
-            <div className="flex-1 flex items-center justify-center overflow-hidden bg-slate-50 rounded-[2.5rem] relative shadow-inner">
+          <div className="flex-1 flex flex-row gap-4 min-h-0 overflow-hidden">
+
+            <div className="flex-[1.65] flex flex-col min-h-0 min-w-0 gap-2">
+
+              <h2 className={`${mochiyPopOne.className} text-white text-sm uppercase tracking-widest text-center shrink-0 drop-shadow-md`}>
+                PREVIEW CETAK
+              </h2>
+
+          <div className="flex-1 min-h-0 bg-white rounded-[20px] shadow-2xl flex flex-col p-3 overflow-hidden border-3 border-white relative">
+            <div className="flex-1 flex items-center justify-center overflow-hidden bg-slate-50 rounded-[1.5rem] relative shadow-inner min-h-0">
               {isPrintSheetsReady ? (
                 <div className="w-full h-full flex flex-col items-center justify-center p-4">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -926,7 +930,7 @@ function FlipbookPrintContent() {
             </div>
 
             {isPrintSheetsReady ? (
-              <div className="flex gap-4 mt-6 shrink-0 justify-center items-center">
+              <div className="flex gap-3 mt-3 shrink-0 justify-center items-center">
                 <button
                   onClick={() => setCurrentPreviewSheet(p => Math.max(0, p - 1))}
                   disabled={currentPreviewSheet === 0}
@@ -946,8 +950,8 @@ function FlipbookPrintContent() {
                 </button>
               </div>
             ) : (
-              <div className="flex gap-4 mt-6 shrink-0 justify-center">
-                <span className="px-6 py-3 rounded-full bg-[#f15a09] text-white font-black text-xs uppercase tracking-widest">COVER FLIPBOOK</span>
+              <div className="flex gap-3 mt-3 shrink-0 justify-center">
+                <span className="px-5 py-2 rounded-full bg-[#f15a09] text-white font-black text-[10px] uppercase tracking-widest">COVER FLIPBOOK</span>
               </div>
             )}
 
@@ -969,17 +973,26 @@ function FlipbookPrintContent() {
               </div>
             )}
           </div>
-          {/* Bottom Panel: QR & Buttons Split */}
-          <div className="flex-[0.8] bg-white rounded-[24px] shadow-2xl flex flex-row p-6 overflow-hidden border-3 border-white shrink-0 min-h-0 gap-6">
 
-             {/* Bottom Left: QR Code */}
-             <div className="flex-1 flex flex-col items-center justify-center text-center">
+            </div>
+
+
+
+            <div className="flex-1 flex flex-col min-h-0 min-w-0 gap-2">
+
+              <h2 className={`${mochiyPopOne.className} text-white text-sm uppercase tracking-widest text-center shrink-0 drop-shadow-md`}>
+                UNDUH & CETAK
+              </h2>
+
+          <div className="flex-1 min-h-0 bg-white rounded-[20px] shadow-2xl flex flex-col items-center p-4 overflow-y-auto border-3 border-white">
+
+             <div className="shrink-0 flex flex-col items-center text-center w-full max-w-[300px] mx-auto">
                 <h3 className={`${mochiyPopOne.className} text-slate-900 text-sm uppercase leading-relaxed mb-1`}>SCAN QR CODE</h3>
                 <h3 className={`${mochiyPopOne.className} text-[#f15a09] text-[10px] uppercase mb-4 tracking-tighter`}>DOWNLOAD SOFTFILE</h3>
 
-                <div className="p-4 bg-[#f15a09] rounded-[2rem] shadow-xl mb-4 relative group">
-                  <div className="bg-white p-3 rounded-[1.2rem] shadow-inner">
-                    <QRCode value={downloadUrl} size={120} level="H" />
+                <div className="p-5 bg-[#f15a09] rounded-[2rem] shadow-xl relative group mx-auto">
+                  <div className="bg-white p-4 rounded-[1.2rem] shadow-inner flex items-center justify-center">
+                    <QRCode value={downloadUrl} size={200} level="H" />
                   </div>
               {uploadStage !== "success" && (
                 <div className="absolute inset-0 bg-[#f15a09]/80 backdrop-blur-sm rounded-[3rem] flex items-center justify-center flex-col p-6">
@@ -1010,10 +1023,9 @@ function FlipbookPrintContent() {
             </div>
              </div>
 
-             {/* Bottom Right: Cetak */}
-             <div className="flex-1 flex flex-col justify-center border-l-4 border-slate-50 pl-6 gap-4 h-full">
+             <div className="flex-1 flex flex-col items-center justify-center border-t-4 border-slate-50 pt-4 mt-4 gap-3 w-full max-w-[300px] mx-auto min-h-0">
                 {isPrintSheetsReady && (
-                  <div className="grid grid-cols-2 gap-3 mb-2 w-full">
+                  <div className="grid grid-cols-2 gap-3 mb-2 w-full shrink-0">
                     <div className="bg-orange-50 rounded-2xl p-3 text-center border-2 border-orange-100">
                   <p className="text-2xl font-black text-[#f15a09]">40</p>
                   <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Halaman</p>
@@ -1026,7 +1038,7 @@ function FlipbookPrintContent() {
             )}
 
                 {/* Print Quantity Selector */}
-                <div className="flex flex-col items-center mb-4 w-full px-4 mt-auto">
+                <div className="flex flex-col items-center mb-2 w-full">
                   <p className={`${mochiyPopOne.className} text-[10px] text-slate-400 mb-3 uppercase tracking-widest`}>JUMLAH CETAK</p>
               <div className="flex items-center gap-6">
                 <button
@@ -1057,7 +1069,7 @@ function FlipbookPrintContent() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-4 w-full">
+            <div className="flex w-full justify-center">
               <button
                 onClick={handleMainPrintAction}
                 disabled={isPrinting || !isPrintSheetsReady}
@@ -1068,21 +1080,25 @@ function FlipbookPrintContent() {
             </div>
             </div>
           </div>
+
+            </div>
+
+          </div>
+
         </main>
 
-        {/* Footer */}
-        <footer className="h-20 flex items-center justify-center gap-4 pb-4">
+        <footer className="shrink-0 flex items-center justify-center gap-3 py-3 flex-wrap">
           {isUploadFailed && (
             <button
               onClick={retryUpload}
-              className="rounded-full border-2 border-white px-8 py-4 text-sm font-black uppercase tracking-widest text-white transition-colors hover:bg-white/10"
+              className="rounded-full border-2 border-white px-6 py-2.5 text-xs font-black uppercase tracking-widest text-white transition-colors hover:bg-white/10"
             >
               UPLOAD GAGAL — COBA LAGI
             </button>
           )}
           <button
             onClick={handleNewSession}
-            className="rounded-full bg-white px-12 py-3 text-lg font-black uppercase tracking-widest text-[#f15a09] shadow-2xl transition-transform hover:scale-[1.03] active:scale-[0.98]"
+            className="rounded-full bg-white px-10 py-2.5 text-sm font-black uppercase tracking-widest text-[#f15a09] shadow-2xl transition-transform hover:scale-[1.03] active:scale-[0.98]"
           >
             SESI BARU
           </button>

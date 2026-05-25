@@ -79,13 +79,15 @@ function FlipbookRenderContent() {
   // Drawing Canvas Logic
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [previewScale, setPreviewScale] = useState(1);
   const [history, setHistory] = useState<string[]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
   const [color, setColor] = useState("#ffffff");
   const [brushSize, setBrushSize] = useState(10);
 
   // Sticker Feature Logic
-  const [activeMode, setActiveMode] = useState<"draw" | "sticker">("draw");
+  const [activeMode, setActiveMode] = useState<"draw" | "sticker">("sticker");
   const [stickersList, setStickersList] = useState<any[]>([]);
   const [placedStickers, setPlacedStickers] = useState<any[]>([]);
   const [selectedStickerId, setSelectedStickerId] = useState<string | null>(null);
@@ -228,7 +230,7 @@ function FlipbookRenderContent() {
             ctx.fillRect(0, 0, tw, th);
             // Only draw if the image actually loaded
             if (fImg.naturalWidth > 0) {
-              ctx.drawImage(fImg, 0, 0);
+              ctx.drawImage(fImg, 0, 0, tw, th);
             }
             if (tImgObj) ctx.drawImage(tImgObj, 0, 0, tw, th);
             templatedFrames.push(offCanvas.toDataURL("image/jpeg", 0.95));
@@ -289,6 +291,27 @@ function FlipbookRenderContent() {
 
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 
+  useEffect(() => {
+    const el = previewRef.current;
+    if (!el || isLoading) return;
+
+    const updateScale = () => {
+      const rect = el.getBoundingClientRect();
+      if (rect.height > 0 && dim.h > 0) {
+        setPreviewScale(rect.height / dim.h);
+      }
+    };
+
+    updateScale();
+    const ro = new ResizeObserver(updateScale);
+    ro.observe(el);
+    window.addEventListener("resize", updateScale);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", updateScale);
+    };
+  }, [dim.w, dim.h, isLoading, selectedFrameIndex, showFlipbookPreview]);
+
   const previewFilter = useMemo(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("flipbook_coverEdit");
@@ -307,8 +330,9 @@ function FlipbookRenderContent() {
 
   // -- Math Helpers
   const getCoordinates = (e: any) => {
-    if (!containerRef.current) return { x: 0, y: 0 };
-    const rect = containerRef.current.getBoundingClientRect();
+    const target = previewRef.current ?? containerRef.current;
+    if (!target) return { x: 0, y: 0 };
+    const rect = target.getBoundingClientRect();
     let clientX = e.clientX;
     let clientY = e.clientY;
     if (e.touches && e.touches.length > 0) {
@@ -451,7 +475,7 @@ function FlipbookRenderContent() {
         url: `/api/image-proxy?url=${encodeURIComponent(fullPath)}`,
         x: dim.w / 2, // center
         y: dim.h / 2, // center
-        scale: 1,
+        scale: 1.25,
         rotation: 0,
       }
     ]);
@@ -497,7 +521,8 @@ function FlipbookRenderContent() {
       draw(e);
       return;
     }
-    if (!dragState.current.isDragging || !dragState.current.id || !containerRef.current) return;
+    const target = previewRef.current ?? containerRef.current;
+    if (!dragState.current.isDragging || !dragState.current.id || !target) return;
 
     let clientX = e.clientX;
     let clientY = e.clientY;
@@ -506,7 +531,7 @@ function FlipbookRenderContent() {
       clientY = e.touches[0].clientY;
     }
 
-    const rect = containerRef.current.getBoundingClientRect();
+    const rect = target.getBoundingClientRect();
     const scaleX = dim.w / rect.width;
     const scaleY = dim.h / rect.height;
 
@@ -672,7 +697,7 @@ function FlipbookRenderContent() {
             ctx.translate(st.x, st.y);
             ctx.rotate((st.rotation * Math.PI) / 180);
             ctx.scale(st.scale, st.scale);
-            const drawW = 200;
+            const drawW = 300;
             const drawH = (200 / img.width) * img.height;
             ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
             ctx.restore();
@@ -942,7 +967,7 @@ function FlipbookRenderContent() {
               ctx.translate(st.x, st.y);
               ctx.rotate((st.rotation * Math.PI) / 180);
               ctx.scale(st.scale, st.scale);
-              const drawW = 200;
+              const drawW = 300;
               const drawH = (200 / img.width) * img.height;
               ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
               ctx.restore();
@@ -979,7 +1004,7 @@ function FlipbookRenderContent() {
 
   return (
     <div
-      className="relative h-screen w-full overflow-hidden bg-[#f15a09] font-sans text-slate-900 flex flex-col p-6 lg:p-10"
+      className="relative h-screen w-full overflow-hidden bg-[#f15a09] font-sans text-slate-900 flex flex-col p-2 sm:p-3"
       onMouseMove={onPointerMove}
       onMouseUp={onPointerUp}
       onMouseLeave={onPointerUp}
@@ -995,49 +1020,54 @@ function FlipbookRenderContent() {
         </div>
       )}
 
-      {/* Container Frame */}
-      <div className="relative flex-1 flex flex-col border-[6px] border-white rounded-[40px] overflow-hidden bg-[#f15a09]">
+      <div className="relative flex-1 flex flex-col border-[4px] border-white rounded-[30px] overflow-hidden bg-[#f15a09] min-h-0">
         
-        {/* Header Title & Timer Badge */}
-        <header className="relative z-10 flex items-center justify-between px-12 py-6 shrink-0 h-24">
-          <h2 className={`${mochiyPopOne.className} text-white text-3xl uppercase tracking-widest drop-shadow-md`}>
+        <header className="relative z-10 flex items-center justify-between px-5 py-2 shrink-0">
+          <h2 className={`${mochiyPopOne.className} text-white text-base sm:text-lg uppercase tracking-widest drop-shadow-md`}>
             PERSONALISASI
           </h2>
 
-          <div className="flex items-center gap-4">
-            {/* Timer */}
-            <div className="flex items-center gap-3 bg-white/20 backdrop-blur-xl px-6 py-2 rounded-full border border-white/40 shadow-lg">
+          <div className="flex items-center gap-2 bg-white/20 backdrop-blur-xl px-4 py-1.5 rounded-full border border-white/40 shadow-lg">
                <div className={`w-2 h-2 rounded-full bg-white ${timeLeft <= 20 ? 'animate-ping' : 'animate-pulse'}`}></div>
-               <span className="text-white font-black tabular-nums tracking-widest text-lg">
+               <span className="text-white font-black tabular-nums tracking-widest text-base">
                  {formatTime(timeLeft)}
                </span>
-            </div>
           </div>
         </header>
 
-        {/* Content Stacked for Portrait */}
-        <main className="flex-1 flex flex-col gap-4 px-4 pb-4 overflow-hidden">
-          
-          {/* Top Panel: Main Workspace (Preview + Doodle + Stickers) */}
-          <div className="flex-[1.2] bg-white rounded-[24px] shadow-2xl relative overflow-hidden border-3 border-white flex flex-col shrink-0">
+        <main className="flex-1 flex flex-col gap-3 px-4 pb-3 min-h-0 overflow-hidden">
+
+          <div className="flex-1 flex flex-row gap-4 min-h-0 overflow-hidden">
+
+            <div className="flex-[1.55] flex flex-col min-h-0 min-w-0 gap-2">
+
+              <h2 className={`${mochiyPopOne.className} text-white text-sm uppercase tracking-widest text-center shrink-0 drop-shadow-md`}>
+                HASIL FLIPBOOK
+              </h2>
+
+          <div className="flex-1 min-h-0 bg-white rounded-[20px] shadow-2xl relative overflow-hidden border-3 border-white flex flex-col">
             <div 
               ref={containerRef}
-              className="flex-1 flex items-center justify-center p-8 overflow-hidden select-none relative"
+              className="flex-1 flex items-center justify-center p-4 overflow-hidden select-none relative min-h-0 w-full"
               onMouseDown={(e) => { if (activeMode === "draw") startDrawing(e); else if (e.target === e.currentTarget) setSelectedStickerId(null); }}
               onTouchStart={(e) => { if (activeMode === "draw") startDrawing(e); else if (e.target === e.currentTarget) setSelectedStickerId(null); }}
             >
-               <div className="relative shadow-2xl rounded-lg overflow-hidden shrink-0 bg-white" style={{ height: '100%', aspectRatio: `${dim.w} / ${dim.h}` }}>
+               <div
+                 ref={previewRef}
+                 className="relative shadow-2xl rounded-lg overflow-hidden shrink-0 bg-slate-100 h-full max-w-full"
+                 style={{ aspectRatio: `${dim.w} / ${dim.h}` }}
+               >
                   
                   {/* Base Rendered Image or Video Preview */}
                   {showFlipbookPreview && videoUrl ? (
-                     <div className="absolute inset-0 w-full h-full">
+                     <div className="absolute inset-0 w-full h-full bg-white">
                        <video
                          src={videoUrl}
                          autoPlay
                          loop
                          muted
                          playsInline
-                         className="w-full h-full object-cover"
+                         className="w-full h-full object-contain"
                          style={{ 
                            transform: "scaleX(-1)",
                            filter: videoPreviewFilter
@@ -1052,7 +1082,7 @@ function FlipbookRenderContent() {
                          />
                        )}
                      </div>
-                  ) : (
+                  ) : allPreviewFrames[selectedFrameIndex] ? (
                      /* eslint-disable-next-line @next/next/no-img-element */
                      <img 
                         src={allPreviewFrames[selectedFrameIndex]} 
@@ -1060,6 +1090,10 @@ function FlipbookRenderContent() {
                         className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none" 
                         draggable={false}
                      />
+                  ) : (
+                     <div className="absolute inset-0 flex items-center justify-center bg-white">
+                       <div className="w-10 h-10 border-4 border-[#f15a09] border-t-transparent rounded-full animate-spin" />
+                     </div>
                   )}
 
                   {/* Sequence Number Badge */}
@@ -1068,7 +1102,7 @@ function FlipbookRenderContent() {
                   </div>
 
                   {/* STICKER LAYER */}
-                  <div className="absolute inset-0 z-20 pointer-events-none overflow-hidden" style={{ width: dim.w, height: dim.h, transformOrigin: 'top left', transform: `scale(${containerRef.current ? containerRef.current.clientWidth / dim.w : 1})` }}>
+                  <div className="absolute inset-0 z-20 pointer-events-none overflow-hidden" style={{ width: dim.w, height: dim.h, transformOrigin: 'top left', transform: `scale(${previewScale})` }}>
                     {placedStickers.map(st => (
                       <div
                         key={st.id}
@@ -1076,7 +1110,7 @@ function FlipbookRenderContent() {
                         style={{
                           left: st.x,
                           top: st.y,
-                          width: Math.max(200 * st.scale, 40),
+                          width: Math.max(300 * st.scale, 120),
                           transform: `translate(-50%, -50%) rotate(${st.rotation}deg)`,
                         }}
                         onMouseDown={(e) => onStickerPointerDown(e, st.id, 'move')}
@@ -1127,15 +1161,20 @@ function FlipbookRenderContent() {
             </div>
           </div>
 
-          {/* Bottom Area: Filmstrip + Tools Split */}
-          <div className="flex-[0.8] flex gap-4 overflow-hidden min-h-0 shrink-0">
-             
-             {/* Bottom Left Panel: Filmstrip Frame Gallery */}
-             <div className="w-[110px] bg-white rounded-[24px] shadow-2xl flex flex-col p-3 overflow-hidden border-3 border-white shrink-0">
-                <h4 className={`${mochiyPopOne.className} text-[#f15a09] text-[8px] uppercase text-center tracking-widest mb-3 shrink-0`}>
+            </div>
+
+
+
+            <div className="flex-1 flex flex-row gap-2 min-h-0 min-w-0">
+
+             <div className="w-[88px] shrink-0 flex flex-col min-h-0 gap-2">
+
+                <h2 className={`${mochiyPopOne.className} text-white text-[9px] uppercase tracking-widest text-center shrink-0 drop-shadow-md`}>
                    HALAMAN
-                </h4>
-                <div className="flex-1 flex flex-col gap-3 overflow-y-auto pr-1" style={{ scrollbarWidth: "none" }}>
+                </h2>
+
+             <div className="flex-1 min-h-0 bg-white rounded-[16px] shadow-xl flex flex-col p-2 overflow-hidden border-3 border-white">
+                <div className="flex-1 flex flex-col gap-2 overflow-y-auto pr-0.5" style={{ scrollbarWidth: "none" }}>
                   {allPreviewFrames.map((frame, idx) => (
                     <div 
                       key={idx} 
@@ -1163,49 +1202,57 @@ function FlipbookRenderContent() {
                 </div>
              </div>
 
-             {/* Bottom Right Panel: Sidebar Tools */}
-             <div className="flex-1 bg-white rounded-[24px] shadow-2xl p-6 flex flex-col gap-4 border-3 border-white">
+             </div>
+
+
+
+             <div className="flex-1 flex flex-col min-h-0 min-w-0 gap-2">
+
+                <h2 className={`${mochiyPopOne.className} text-white text-sm uppercase tracking-widest text-center shrink-0 drop-shadow-md`}>
+                   ALAT EDIT
+                </h2>
+
+             <div className="flex-1 min-h-0 bg-white rounded-[20px] shadow-2xl p-3 flex flex-col gap-3 overflow-y-auto border-3 border-white custom-scrollbar">
              
-             {/* Mode Selector Header Inside Sidebar */}
-             <div className="bg-slate-50 p-1.5 rounded-full flex gap-1 mb-2 border border-slate-100 shadow-inner shrink-0 max-w-sm mx-auto w-full">
+             <div className="bg-slate-50 p-1 rounded-full flex gap-1 border border-slate-100 shadow-inner shrink-0 w-full">
                 <button 
                   onClick={() => setActiveMode("draw")}
-                  className={`flex-1 py-3 rounded-full font-black text-[10px] tracking-widest transition-all uppercase ${activeMode === "draw" ? "bg-[#f15a09] text-white shadow-lg" : "text-slate-400 hover:text-[#f15a09]"}`}
+                  className={`flex-1 py-2 rounded-full font-black text-[9px] tracking-widest transition-all uppercase ${activeMode === "draw" ? "bg-[#f15a09] text-white shadow-lg" : "text-slate-400 hover:text-[#f15a09]"}`}
                 >
                   CORETAN
                 </button>
                 <button 
                   onClick={() => setActiveMode("sticker")}
-                  className={`flex-1 py-3 rounded-full font-black text-[10px] tracking-widest transition-all uppercase ${activeMode === "sticker" ? "bg-[#f15a09] text-white shadow-lg" : "text-slate-400 hover:text-[#f15a09]"}`}
+                  className={`flex-1 py-2 rounded-full font-black text-[9px] tracking-widest transition-all uppercase ${activeMode === "sticker" ? "bg-[#f15a09] text-white shadow-lg" : "text-slate-400 hover:text-[#f15a09]"}`}
                 >
                   STIKER
                 </button>
              </div>
 
              {activeMode === "draw" ? (
-               <div className="flex flex-col flex-1 gap-4 animate-in slide-in-from-bottom-10 duration-500 max-w-lg mx-auto w-full">
-                  <h4 className={`${mochiyPopOne.className} text-[#f15a09] text-sm uppercase text-center tracking-widest`}>PILIH WARNA</h4>
-                  <div className="flex flex-wrap justify-center gap-3">
+               <div className="flex flex-col flex-1 gap-3 animate-in slide-in-from-bottom-10 duration-500 w-full min-h-0">
+                  <h4 className={`${mochiyPopOne.className} text-[#f15a09] text-[10px] uppercase tracking-widest`}>PILIH WARNA</h4>
+                  <div className="flex flex-wrap gap-2">
                     {colors.map(c => (
                       <button 
                         key={c} 
                         onClick={() => setColor(c)} 
-                        className={`w-14 h-14 rounded-3xl transition-all duration-300 border-4 shadow-sm ${color === c ? "border-[#f15a09] scale-110 shadow-orange-100" : "border-slate-50 opacity-80"}`}
+                        className={`w-9 h-9 rounded-full transition-all duration-300 border-3 shadow-sm ${color === c ? "border-[#f15a09] scale-110 shadow-orange-100" : "border-slate-50 opacity-80"}`}
                         style={{ backgroundColor: c }}
                       />
                     ))}
                   </div>
 
-                  <h4 className={`${mochiyPopOne.className} text-[#f15a09] text-xs uppercase text-center tracking-widest mt-2`}>UKURAN KUAS</h4>
-                  <div className="flex justify-center gap-6">
+                  <h4 className={`${mochiyPopOne.className} text-[#f15a09] text-[10px] uppercase tracking-widest`}>UKURAN KUAS</h4>
+                  <div className="flex gap-3">
                     {[6, 12, 24].map(size => (
-                      <button key={size} onClick={() => setBrushSize(size)} className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${brushSize === size ? "bg-orange-50 text-[#f15a09] border-4 border-[#f15a09]" : "bg-slate-50 text-slate-300 border-4 border-slate-50"}`}>
+                      <button key={size} onClick={() => setBrushSize(size)} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${brushSize === size ? "bg-orange-50 text-[#f15a09] border-3 border-[#f15a09]" : "bg-slate-50 text-slate-300 border-3 border-slate-50"}`}>
                         <div className="bg-current rounded-full" style={{ width: size/2 + 'px', height: size/2 + 'px' }} />
                       </button>
                     ))}
                   </div>
 
-                  <div className="mt-auto grid grid-cols-2 gap-4 pt-2">
+                  <div className="mt-auto grid grid-cols-2 gap-2 pt-1">
                     <button onClick={handleUndo} disabled={(framesData[selectedFrameIndex]?.history?.length || 0) <= 1} className="py-3 bg-slate-50 text-slate-400 rounded-2xl font-black text-xs uppercase tracking-widest border-2 border-slate-100 disabled:opacity-30 flex flex-col items-center gap-1 hover:bg-slate-100 transition-colors">
                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
                        UNDO
@@ -1217,11 +1264,11 @@ function FlipbookRenderContent() {
                   </div>
                </div>
              ) : (
-               <div className="flex flex-col flex-1 gap-4 animate-in slide-in-from-bottom-10 duration-500 max-w-lg mx-auto w-full">
-                  <h4 className={`${mochiyPopOne.className} text-[#f15a09] text-sm uppercase text-center tracking-widest`}>KOLEKSI STIKER</h4>
-                  <div className="flex-1 overflow-y-auto grid grid-cols-4 sm:grid-cols-5 gap-3 custom-scrollbar" style={{ scrollbarWidth: "none" }}>
+               <div className="flex flex-col flex-1 gap-3 animate-in slide-in-from-bottom-10 duration-500 w-full min-h-0">
+                  <h4 className={`${mochiyPopOne.className} text-[#f15a09] text-[10px] uppercase tracking-widest`}>KOLEKSI STIKER</h4>
+                  <div className="flex-1 overflow-y-auto grid grid-cols-2 gap-3 custom-scrollbar min-h-0" style={{ scrollbarWidth: "none" }}>
                     {stickersList.length === 0 ? (
-                      <p className="col-span-4 sm:col-span-5 text-center text-slate-300 text-xs font-bold uppercase mt-10">Tidak ada stiker...</p>
+                      <p className="col-span-2 text-center text-slate-300 text-xs font-bold uppercase mt-6">Tidak ada stiker...</p>
                     ) : (
                       stickersList.map((st) => {
                         let fullPath = st.image_path;
@@ -1234,7 +1281,7 @@ function FlipbookRenderContent() {
                         return (
                           /* eslint-disable-next-line @next/next/no-img-element */
                           <img key={st.id} src={proxyUrl} alt={st.name} onClick={() => addSticker(st)}
-                            className="w-full h-20 object-contain bg-slate-50 border-4 border-white rounded-2xl p-2 cursor-pointer shadow-sm hover:border-[#f15a09] transition-all active:scale-95" />
+                            className="w-full h-28 object-contain bg-slate-50 border-4 border-white rounded-2xl p-2 cursor-pointer shadow-sm hover:border-[#f15a09] transition-all active:scale-95" />
                         );
                       })
                     )}
@@ -1248,32 +1295,37 @@ function FlipbookRenderContent() {
                </div>
              )}
           </div>
-        </div>
+
+             </div>
+
+            </div>
+
+          </div>
+
         </main>
 
-        {/* Footer */}
-        <footer className="h-28 flex items-center justify-center gap-4 px-12 pb-10">
+        <footer className="shrink-0 flex items-center justify-center gap-3 px-6 py-3 flex-wrap">
             <button
               onClick={() => {
                 router.push(`/flipbook-camera?kanvas=${canvasType}&template=${templateId}&time=${timeLeft}`);
               }}
-              className="rounded-full border-2 border-white px-10 py-4 text-sm font-black uppercase tracking-widest text-white transition-colors hover:bg-white/10"
+              className="rounded-full border-2 border-white px-6 py-2.5 text-xs font-black uppercase tracking-widest text-white transition-colors hover:bg-white/10"
             >
               KEMBALI KE KAMERA
             </button>
             <button
                onClick={() => setShowFlipbookPreview(!showFlipbookPreview)}
                disabled={!videoUrl}
-               className={`flex items-center gap-2 px-10 py-4 rounded-full font-black text-sm tracking-widest transition-all duration-300 border-2 uppercase ${showFlipbookPreview ? "bg-white text-[#f15a09] border-white shadow-lg" : "bg-white/20 text-white border-white/40 hover:bg-white/30"} disabled:opacity-40 shrink-0`}
+               className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-black text-xs tracking-widest transition-all duration-300 border-2 uppercase ${showFlipbookPreview ? "bg-white text-[#f15a09] border-white shadow-lg" : "bg-white/20 text-white border-white/40 hover:bg-white/30"} disabled:opacity-40 shrink-0`}
             >
-               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m22 8-6 4 6 4V8Z" /><rect width="14" height="12" x="2" y="6" rx="2" ry="2" /></svg>
+               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m22 8-6 4 6 4V8Z" /><rect width="14" height="12" x="2" y="6" rx="2" ry="2" /></svg>
                {showFlipbookPreview ? "TAMPILKAN COVER" : "PREVIEW ANIMASI"}
             </button>
            <button
              id="btn-finish"
              onClick={handleFinish}
              disabled={isProcessing}
-             className="rounded-full bg-white px-16 py-4 text-xl font-black uppercase tracking-widest text-[#f15a09] shadow-xl transition-transform hover:scale-[1.03] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-70 select-none"
+             className="rounded-full bg-white px-10 py-2.5 text-sm font-black uppercase tracking-widest text-[#f15a09] shadow-xl transition-transform hover:scale-[1.03] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-70 select-none"
            >
              {isProcessing ? (
                <span className="flex items-center gap-3">

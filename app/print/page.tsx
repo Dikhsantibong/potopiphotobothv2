@@ -687,25 +687,29 @@ function PrintContent() {
   const downloadUrl = `https://potopi.site/downloads/${downloadToken}`;
 
   return (
-    <div className="relative h-screen w-full overflow-hidden bg-[#f15a09] font-sans text-slate-900 flex flex-col p-4">
+    <div className="relative h-screen w-full overflow-hidden bg-[#f15a09] font-sans text-slate-900 flex flex-col p-2 sm:p-3">
       
-      {/* Container Frames */}
-      <div className="relative flex-1 flex flex-col border-[4px] border-white rounded-[30px] overflow-hidden bg-[#f15a09]">
+      <div className="relative flex-1 flex flex-col border-[4px] border-white rounded-[30px] overflow-hidden bg-[#f15a09] min-h-0">
         
-        {/* Header Header */}
-        <header className="px-6 py-3 flex items-center justify-between shrink-0">
-           <h1 className={`${mochiyPopOne.className} text-white text-xl uppercase tracking-widest drop-shadow-md`}>CETAK HASIL</h1>
-           <div className="bg-white/20 px-6 py-2 rounded-full border border-white/40 text-white font-black text-sm tracking-widest">
+        <header className="px-5 py-2 flex items-center justify-between shrink-0">
+           <h1 className={`${mochiyPopOne.className} text-white text-base sm:text-lg uppercase tracking-widest drop-shadow-md`}>CETAK HASIL</h1>
+           <div className="bg-white/20 px-4 py-1.5 rounded-full border border-white/40 text-white font-black text-xs sm:text-sm tracking-widest">
              READY FOR PRINT
            </div>
         </header>
 
-        {/* Content Stacked for Portrait */}
-        <main className="flex-1 flex flex-col gap-4 px-4 pb-4 overflow-hidden">
-          
-          {/* Top Panel: Image Preview */}
-          <div className="flex-[1.2] bg-white rounded-[24px] shadow-2xl flex flex-col p-4 overflow-hidden border-3 border-white relative shrink-0">
-             <div className="flex-1 flex items-center justify-center overflow-hidden bg-slate-50 rounded-[2.5rem] relative shadow-inner">
+        <main className="flex-1 flex flex-col gap-3 px-4 pb-3 min-h-0 overflow-hidden">
+
+          <div className="flex-1 flex flex-row gap-4 min-h-0 overflow-hidden">
+
+            <div className="flex-[1.65] flex flex-col min-h-0 min-w-0 gap-2">
+
+              <h2 className={`${mochiyPopOne.className} text-white text-sm uppercase tracking-widest text-center shrink-0 drop-shadow-md`}>
+                PREVIEW HASIL
+              </h2>
+
+          <div className="flex-1 min-h-0 bg-white rounded-[20px] shadow-2xl flex flex-col p-3 overflow-hidden border-3 border-white relative">
+             <div className="flex-1 flex items-center justify-center overflow-hidden bg-slate-50 rounded-[1.5rem] relative shadow-inner min-h-0">
                  {previewMode === "photo" ? (
                     <img src={finalImage} alt="Final" className="h-full object-contain select-none animate-in fade-in duration-500" />
                  ) : previewMode === "gif" && rawPhotos.length > 0 ? (
@@ -720,40 +724,47 @@ function PrintContent() {
                  )}
              </div>
 
-             {/* Preview Tabs Bottom */}
-             <div className="flex gap-4 mt-6 shrink-0 justify-center">
+             <div className="flex gap-2 mt-3 shrink-0 justify-center">
                 <button 
                   onClick={() => setPreviewMode("photo")}
-                  className={`px-8 py-3 rounded-full font-black text-xs uppercase tracking-widest transition-all ${previewMode === "photo" ? "bg-[#f15a09] text-white shadow-lg" : "bg-slate-100 text-slate-400"}`}
+                  className={`px-5 py-2 rounded-full font-black text-[10px] uppercase tracking-widest transition-all ${previewMode === "photo" ? "bg-[#f15a09] text-white shadow-lg" : "bg-slate-100 text-slate-400"}`}
                 >
                   PHOTO
                 </button>
                 <button 
                   onClick={() => setPreviewMode("gif")}
-                  className={`px-8 py-3 rounded-full font-black text-xs uppercase tracking-widest transition-all ${previewMode === "gif" ? "bg-[#f15a09] text-white shadow-lg" : "bg-slate-100 text-slate-400"}`}
+                  className={`px-5 py-2 rounded-full font-black text-[10px] uppercase tracking-widest transition-all ${previewMode === "gif" ? "bg-[#f15a09] text-white shadow-lg" : "bg-slate-100 text-slate-400"}`}
                 >
                   GIF
                 </button>
                 <button 
                   onClick={() => setPreviewMode("live")}
-                  className={`px-8 py-3 rounded-full font-black text-xs uppercase tracking-widest transition-all ${previewMode === "live" ? "bg-[#f15a09] text-white shadow-lg" : "bg-slate-100 text-slate-400"}`}
+                  className={`px-5 py-2 rounded-full font-black text-[10px] uppercase tracking-widest transition-all ${previewMode === "live" ? "bg-[#f15a09] text-white shadow-lg" : "bg-slate-100 text-slate-400"}`}
                 >
                   LIVE
                 </button>
              </div>
           </div>
 
-          {/* Bottom Panel: QR & Print Options Split */}
-          <div className="flex-[0.8] bg-white rounded-[24px] shadow-2xl flex flex-row p-6 overflow-hidden border-3 border-white shrink-0 min-h-0 gap-6">
+            </div>
+
+
+
+            <div className="flex-1 flex flex-col min-h-0 min-w-0 gap-2">
+
+              <h2 className={`${mochiyPopOne.className} text-white text-sm uppercase tracking-widest text-center shrink-0 drop-shadow-md`}>
+                UNDUH & CETAK
+              </h2>
+
+          <div className="flex-1 min-h-0 bg-white rounded-[20px] shadow-2xl flex flex-col items-center p-4 overflow-y-auto border-3 border-white">
              
-             {/* Bottom Left: QR Code */}
-             <div className="flex-1 flex flex-col items-center justify-center text-center">
+             <div className="shrink-0 flex flex-col items-center text-center w-full max-w-[300px] mx-auto">
                  <h3 className={`${mochiyPopOne.className} text-slate-900 text-sm uppercase leading-relaxed mb-1`}>SCAN QR CODE</h3>
                  <h3 className={`${mochiyPopOne.className} text-[#f15a09] text-[10px] uppercase mb-4 tracking-tighter`}>DOWNLOAD SOFTFILE</h3>
 
-                 <div className="p-4 bg-[#f15a09] rounded-[2rem] shadow-xl mb-2 relative group">
-                    <div className="bg-white p-3 rounded-[1.2rem] shadow-inner">
-                       <QRCode value={downloadUrl} size={120} level="H" />
+                 <div className="p-5 bg-[#f15a09] rounded-[2rem] shadow-xl relative group mx-auto">
+                    <div className="bg-white p-4 rounded-[1.2rem] shadow-inner flex items-center justify-center">
+                       <QRCode value={downloadUrl} size={200} level="H" />
                     </div>
                 {uploadStage !== "success" && (
                    <div className="absolute inset-0 bg-[#f15a09]/80 backdrop-blur-sm rounded-[3rem] flex items-center justify-center flex-col p-6">
@@ -783,15 +794,11 @@ function PrintContent() {
                 )}
              </div>
 
-
-
-
              </div>
 
-             {/* Bottom Right: Cetak */}
-             <div className="flex-1 flex flex-col justify-center border-l-4 border-slate-50 pl-6 gap-4 h-full">
+             <div className="flex-1 flex flex-col items-center justify-center border-t-4 border-slate-50 pt-4 mt-4 gap-3 w-full max-w-[300px] mx-auto min-h-0">
                 {/* Print Quantity Selector */}
-                <div className="flex flex-col items-center mb-4 w-full px-4">
+                <div className="flex flex-col items-center mb-2 w-full">
                   <p className={`${mochiyPopOne.className} text-[10px] text-slate-400 mb-3 uppercase tracking-widest`}>JUMLAH CETAK</p>
                   <div className="flex items-center gap-6">
                     <button 
@@ -822,7 +829,7 @@ function PrintContent() {
                   </div>
                 </div>
 
-                <div className="flex gap-4 w-full">
+                <div className="flex w-full justify-center">
                   <button 
                     onClick={() => {
                       const cat = templateCategory.toUpperCase();
@@ -847,13 +854,16 @@ function PrintContent() {
              </div>
           </div>
 
+            </div>
+
+          </div>
+
         </main>
 
-        {/* Footer: Sesi Baru */}
-        <footer className="h-20 flex items-center justify-center gap-4 pb-4">
+        <footer className="shrink-0 flex items-center justify-center gap-4 py-3">
            <button
              onClick={handleNewSession}
-             className="rounded-full bg-white px-12 py-3 text-lg font-black uppercase tracking-widest text-[#f15a09] shadow-2xl transition-transform hover:scale-[1.03] active:scale-[0.98]"
+             className="rounded-full bg-white px-10 py-2.5 text-sm font-black uppercase tracking-widest text-[#f15a09] shadow-2xl transition-transform hover:scale-[1.03] active:scale-[0.98]"
            >
              SESI BARU
            </button>
