@@ -270,6 +270,20 @@ export default function SettingsPage() {
       ),
       type: "url" as const,
     },
+    {
+      key: "MACHINE_NAME",
+      label: "Nama Mesin",
+      description: "Nama mesin untuk tracking transaksi (contoh: Potopi Kolaka)",
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+          <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+          <line x1="6" y1="6" x2="6.01" y2="6"/>
+          <line x1="6" y1="18" x2="6.01" y2="18"/>
+        </svg>
+      ),
+      type: "text" as const,
+    },
   ];
 
   const [visibleFields, setVisibleFields] = useState<Record<string, boolean>>({});
@@ -287,7 +301,7 @@ export default function SettingsPage() {
       {/* Toast */}
       {toast && (
         <div
-          className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-2xl shadow-2xl text-white font-semibold text-sm transition-all duration-300 animate-slide-down ${
+          className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 px-6 py-2 rounded-xl shadow-2xl text-white font-semibold text-[10px] transition-all duration-300 animate-slide-down ${
             toast.type === "success"
               ? "bg-gradient-to-r from-emerald-500 to-green-500"
               : "bg-gradient-to-r from-red-500 to-rose-500"
@@ -298,7 +312,7 @@ export default function SettingsPage() {
       )}
 
       {/* Header */}
-      <header className="sticky top-0 z-40 flex items-center justify-between px-8 py-6 border-b border-slate-100/80 bg-white/60 backdrop-blur-xl">
+      <header className="sticky top-0 z-40 flex items-center justify-between px-8 py-2 border-b border-slate-100/80 bg-white/60 backdrop-blur-xl">
         <button
           onClick={handleBack}
           className="flex items-center gap-3 text-slate-500 hover:text-slate-800 transition-colors duration-200 group"
@@ -309,12 +323,12 @@ export default function SettingsPage() {
               <path d="M19 12H5" />
             </svg>
           </div>
-          <span className="font-semibold text-sm tracking-wide">Kembali</span>
+          <span className="font-semibold text-[10px] tracking-wide">Kembali</span>
         </button>
 
         <div className="text-center">
           <h1 className="text-xl font-bold text-slate-800 tracking-tight">Konfigurasi Mesin</h1>
-          <p className="text-xs text-slate-400 mt-0.5">Pengaturan Hardware & Server</p>
+          <p className="text-[10px] text-slate-400 mt-0">Pengaturan Hardware & Server</p>
         </div>
 
         <div className="flex gap-3">
@@ -348,28 +362,28 @@ export default function SettingsPage() {
       </header>
 
       {/* Content */}
-      <main className="flex-1 overflow-hidden relative z-10 w-full px-8 py-8">
+      <main className="flex-1 overflow-hidden relative z-10 w-full px-3 py-2.5">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4">
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
             <div className="h-10 w-10 rounded-full border-[3px] border-slate-200 border-t-orange-500 animate-spin" />
-            <p className="text-sm text-slate-400 font-medium">Memuat konfigurasi...</p>
+            <p className="text-[10px] text-slate-400 font-medium">Memuat konfigurasi...</p>
           </div>
         ) : (
-          <div className="h-full grid grid-cols-1 lg:grid-cols-3 gap-8 overflow-hidden pr-2">
+          <div className="h-full grid grid-cols-1 lg:grid-cols-3 gap-3 overflow-hidden pr-2">
             
             {/* Column 1: API Server */}
-            <div className="flex flex-col gap-6 overflow-y-auto custom-scrollbar pb-6">
+            <div className={`flex flex-col gap-3 overflow-y-auto custom-scrollbar transition-[padding] duration-300 ${focusedInput ? 'pb-[300px]' : 'pb-6'}`}>
             {/* Section 1: Server Config */}
-            <section className="space-y-5">
+            <section className="space-y-3">
               <div className="flex items-center gap-3 mb-2 px-2">
-                <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center">
+                <div className="w-6 h-6 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center">
                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                 </div>
-                <h2 className="text-lg font-black text-slate-800 uppercase tracking-widest">API Server</h2>
+                <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest">API Server</h2>
               </div>
 
-              <div className="bg-amber-50/80 border border-amber-200/50 rounded-2xl p-5 flex gap-4 items-start">
-                <div className="p-2 bg-amber-100 rounded-xl text-amber-600 shrink-0 mt-0.5">
+              <div className="bg-amber-50/80 border border-amber-200/50 rounded-xl p-3 flex gap-3 items-start">
+                <div className="p-2 bg-amber-100 rounded-xl text-amber-600 shrink-0 mt-0">
                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="10" />
                     <path d="M12 16v-4" />
@@ -377,22 +391,22 @@ export default function SettingsPage() {
                   </svg>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-amber-800 mb-1">Perhatian</p>
-                  <p className="text-xs text-amber-700/80 leading-relaxed">
+                  <p className="text-[10px] font-semibold text-amber-800 mb-1">Perhatian</p>
+                  <p className="text-[10px] text-amber-700/80 leading-relaxed">
                     Perubahan konfigurasi API memerlukan <strong>restart aplikasi</strong> agar berlaku sepenuhnya.
                   </p>
                 </div>
               </div>
 
               {envFields.map((field) => (
-                <div key={field.key} className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden p-5 transition-all hover:border-slate-200 hover:shadow-md">
-                  <div className="flex items-start gap-4">
-                    <div className="p-2.5 bg-slate-50 text-slate-400 rounded-xl shrink-0 mt-0.5">
+                <div key={field.key} className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden p-3 transition-all hover:border-slate-200 hover:shadow-md">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-slate-50 text-slate-400 rounded-xl shrink-0 mt-0">
                       {field.icon}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <label className="block text-sm font-bold text-slate-700 mb-1">{field.label}</label>
-                      <p className="text-[11px] text-slate-400 mb-3">{field.description}</p>
+                      <label className="block text-[10px] font-bold text-slate-700 mb-1">{field.label}</label>
+                      <p className="text-[9px] text-slate-400 mb-1.5">{field.description}</p>
                       <div className="relative">
                         <input
                           type={field.type === "password" && !visibleFields[field.key] ? "password" : "text"}
@@ -400,7 +414,7 @@ export default function SettingsPage() {
                           onFocus={() => onInputFocus(field.key, envData[field.key] || "")}
                           onChange={(e) => handleChange(field.key, e.target.value)}
                           placeholder={`Masukkan ${field.label}...`}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-mono text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-400/40 focus:border-orange-400 transition-all"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-mono text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-400/40 focus:border-orange-400 transition-all"
                         />
                         {field.type === "password" && (
                           <button
@@ -423,7 +437,7 @@ export default function SettingsPage() {
               <button
                 onClick={handleSaveEnv}
                 disabled={saving || !hasChanges}
-                className={`w-full py-4 rounded-2xl font-bold transition-all shrink-0 ${
+                className={`w-full py-2.5 rounded-xl font-bold transition-all shrink-0 ${
                   hasChanges ? "bg-orange-600 text-white shadow-lg hover:bg-orange-700" : "bg-slate-100 text-slate-400 cursor-not-allowed"
                 }`}
               >
@@ -433,30 +447,30 @@ export default function SettingsPage() {
           </div>
 
             {/* Column 2: Hardware Config */}
-            <div className="flex flex-col gap-6 overflow-y-auto custom-scrollbar pb-6">
+            <div className={`flex flex-col gap-3 overflow-y-auto custom-scrollbar transition-[padding] duration-300 ${focusedInput ? 'pb-[300px]' : 'pb-6'}`}>
  
              {/* Section 2: Hardware Config */}
-             <section className="space-y-5">
+             <section className="space-y-3">
                <div className="flex items-center gap-3 mb-2 px-2">
-                 <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                 <div className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center">
                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM7 21h10M12 18v3"/></svg>
                 </div>
-                <h2 className="text-lg font-black text-slate-800 uppercase tracking-widest">Hardware Mesin</h2>
+                <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest">Hardware Mesin</h2>
               </div>
 
               {/* Camera Selection */}
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-                <div className="flex items-start gap-4">
-                  <div className="p-2.5 bg-emerald-50 text-emerald-500 rounded-xl shrink-0 mt-0.5">
+              <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-3">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-emerald-50 text-emerald-500 rounded-xl shrink-0 mt-0">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Pilih Kamera</label>
-                    <p className="text-[11px] text-slate-400 mb-3">Tentukan kamera input yang akan digunakan</p>
+                    <label className="block text-[10px] font-bold text-slate-700 mb-1">Pilih Kamera</label>
+                    <p className="text-[9px] text-slate-400 mb-1.5">Tentukan kamera input yang akan digunakan</p>
                     <select
                       value={selectedCamera}
                       onChange={(e) => setSelectedCamera(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 focus:border-emerald-400 appearance-none bg-no-repeat bg-[right_1rem_center]"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 focus:border-emerald-400 appearance-none bg-no-repeat bg-[right_1rem_center]"
                       style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")` }}
                     >
                       <option value="">Default (Auto)</option>
@@ -471,18 +485,18 @@ export default function SettingsPage() {
               </div>
 
               {/* Printer Selection (Standard) */}
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-                <div className="flex items-start gap-4">
-                  <div className="p-2.5 bg-blue-50 text-blue-500 rounded-xl shrink-0 mt-0.5">
+              <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-3">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-blue-50 text-blue-500 rounded-xl shrink-0 mt-0">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Printer Utama (4R)</label>
-                    <p className="text-[11px] text-slate-400 mb-3">Driver untuk cetak reguler 4R (Standar)</p>
+                    <label className="block text-[10px] font-bold text-slate-700 mb-1">Printer Utama (4R)</label>
+                    <p className="text-[9px] text-slate-400 mb-1.5">Driver untuk cetak reguler 4R (Standar)</p>
                     <select
                       value={printerName}
                       onChange={(e) => setPrinterName(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400/40 focus:border-blue-400 appearance-none bg-no-repeat bg-[right_1rem_center]"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400/40 focus:border-blue-400 appearance-none bg-no-repeat bg-[right_1rem_center]"
                       style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")` }}
                     >
                       <option value="">Default (Auto)</option>
@@ -497,18 +511,18 @@ export default function SettingsPage() {
               </div>
 
               {/* Printer Orientation */}
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-                <div className="flex items-start gap-4">
-                  <div className="p-2.5 bg-amber-50 text-amber-500 rounded-xl shrink-0 mt-0.5">
+              <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-3">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-amber-50 text-amber-500 rounded-xl shrink-0 mt-0">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="14" x="3" y="3" rx="2"/><path d="M12 17v4"/><path d="M8 21h8"/></svg>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Orientasi Cetak (Tipe Printer)</label>
-                    <p className="text-[11px] text-slate-400 mb-3">DNP = kertas keluar landscape (diputar). Epson = kertas keluar portrait (sesuai template).</p>
+                    <label className="block text-[10px] font-bold text-slate-700 mb-1">Orientasi Cetak (Tipe Printer)</label>
+                    <p className="text-[9px] text-slate-400 mb-1.5">DNP = kertas keluar landscape (diputar). Epson = kertas keluar portrait (sesuai template).</p>
                     <select
                       value={printerOrientation}
                       onChange={(e) => setPrinterOrientation(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 appearance-none bg-no-repeat bg-[right_1rem_center]"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 appearance-none bg-no-repeat bg-[right_1rem_center]"
                       style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")` }}
                     >
                       <option value="landscape">DNP (Landscape — Putar Otomatis)</option>
@@ -519,18 +533,18 @@ export default function SettingsPage() {
               </div>
 
               {/* Printer Selection (Split) */}
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-                <div className="flex items-start gap-4">
-                  <div className="p-2.5 bg-rose-50 text-rose-500 rounded-xl shrink-0 mt-0.5">
+              <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-3">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-rose-50 text-rose-500 rounded-xl shrink-0 mt-0">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M8 11h8"/><path d="M12 7v8"/></svg>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Printer Split (2R / Flipbook)</label>
-                    <p className="text-[11px] text-slate-400 mb-3">Driver khusus dengan mode potong (Split)</p>
+                    <label className="block text-[10px] font-bold text-slate-700 mb-1">Printer Split (2R / Flipbook)</label>
+                    <p className="text-[9px] text-slate-400 mb-1.5">Driver khusus dengan mode potong (Split)</p>
                     <select
                       value={printerSplitName}
                       onChange={(e) => setPrinterSplitName(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-400/40 focus:border-rose-400 appearance-none bg-no-repeat bg-[right_1rem_center]"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-400/40 focus:border-rose-400 appearance-none bg-no-repeat bg-[right_1rem_center]"
                       style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")` }}
                     >
                       <option value="">Pilih Driver Split...</option>
@@ -546,7 +560,7 @@ export default function SettingsPage() {
 
               <button
                 onClick={handleSaveHardware}
-                className="w-full py-4 rounded-2xl font-bold bg-emerald-600 text-white shadow-lg hover:bg-emerald-700 transition-all font-black uppercase tracking-widest text-sm shrink-0"
+                className="w-full py-2.5 rounded-xl font-bold bg-emerald-600 text-white shadow-lg hover:bg-emerald-700 transition-all font-black uppercase tracking-widest text-[10px] shrink-0"
               >
                 Simpan Hardware & Fitur
               </button>
@@ -554,27 +568,27 @@ export default function SettingsPage() {
           </div>
 
             {/* Column 3: Features & Session */}
-            <div className="flex flex-col gap-8 overflow-y-auto custom-scrollbar pb-6">
+            <div className={`flex flex-col gap-3 overflow-y-auto custom-scrollbar transition-[padding] duration-300 ${focusedInput ? 'pb-[300px]' : 'pb-6'}`}>
 
              {/* Section 3: Feature Management */}
-             <section className="space-y-5">
+             <section className="space-y-3">
                <div className="flex items-center gap-3 mb-2 px-2">
-                 <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                 <div className="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M2 12h20"/></svg>
                  </div>
-                 <h2 className="text-lg font-black text-slate-800 uppercase tracking-widest">Manajemen Fitur</h2>
+                 <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest">Manajemen Fitur</h2>
                </div>
 
-               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden divide-y divide-slate-100">
+               <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden divide-y divide-slate-100">
                   {[
                     { id: 'koran', label: 'Kanvas Koran', desc: 'Layout ala koran editorial' },
                     { id: 'reguler', label: 'Kanvas Reguler', desc: 'Layout photostrip klasik' },
                     { id: 'flipbook', label: 'Kanvas Flipbook', desc: 'Animasi flipbook video' }
                   ].map((item) => (
-                    <div key={item.id} className="p-5 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                    <div key={item.id} className="p-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
                       <div className="flex flex-col">
-                        <span className="text-sm font-bold text-slate-700">{item.label}</span>
-                        <span className="text-[11px] text-slate-400">{item.desc}</span>
+                        <span className="text-[10px] font-bold text-slate-700">{item.label}</span>
+                        <span className="text-[9px] text-slate-400">{item.desc}</span>
                       </div>
                       <button
                         onClick={() => toggleCanvas(item.id)}
@@ -598,22 +612,22 @@ export default function SettingsPage() {
              </section>
 
              {/* Section 4: Session Settings */}
-             <section className="space-y-5">
+             <section className="space-y-3">
                <div className="flex items-center gap-3 mb-2 px-2">
-                 <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center">
+                 <div className="w-6 h-6 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center">
                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                  </div>
-                 <h2 className="text-lg font-black text-slate-800 uppercase tracking-widest">Sesi Sesi Foto</h2>
+                 <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest">Sesi Sesi Foto</h2>
                </div>
 
-               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 transition-all hover:border-slate-200 hover:shadow-md">
-                 <div className="flex items-start gap-4">
-                   <div className="p-2.5 bg-rose-50 text-rose-500 rounded-xl shrink-0 mt-0.5">
+               <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-3 transition-all hover:border-slate-200 hover:shadow-md">
+                 <div className="flex items-start gap-3">
+                   <div className="p-2 bg-rose-50 text-rose-500 rounded-xl shrink-0 mt-0">
                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                    </div>
                    <div className="flex-1 min-w-0">
-                     <label className="block text-sm font-bold text-slate-700 mb-1">Durasi Sesi (Detik)</label>
-                     <p className="text-[11px] text-slate-400 mb-3">Tentukan waktu maksimal sekali sesi (misal 300 untuk 5 menit)</p>
+                     <label className="block text-[10px] font-bold text-slate-700 mb-1">Durasi Sesi (Detik)</label>
+                     <p className="text-[9px] text-slate-400 mb-1.5">Tentukan waktu maksimal sekali sesi (misal 300 untuk 5 menit)</p>
                      <div className="flex items-center gap-3">
                         <input
                           type="number"
@@ -625,9 +639,9 @@ export default function SettingsPage() {
                               keyboardRef.current.setInput(e.target.value);
                             }
                           }}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-mono text-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-400/40 focus:border-rose-400 transition-all"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-mono text-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-400/40 focus:border-rose-400 transition-all"
                         />
-                        <span className="text-sm font-bold text-slate-400 shrink-0">≈ {Math.floor(sessionTimeout / 60)}m {sessionTimeout % 60}s</span>
+                        <span className="text-[10px] font-bold text-slate-400 shrink-0">≈ {Math.floor(sessionTimeout / 60)}m {sessionTimeout % 60}s</span>
                      </div>
                    </div>
                  </div>
@@ -639,22 +653,22 @@ export default function SettingsPage() {
               </section>
 
              {/* Section 5: Queue Settings */}
-             <section className="space-y-5">
+             <section className="space-y-3">
                <div className="flex items-center gap-3 mb-2 px-2">
-                 <div className="w-8 h-8 rounded-lg bg-cyan-100 text-cyan-600 flex items-center justify-center">
+                 <div className="w-6 h-6 rounded-lg bg-cyan-100 text-cyan-600 flex items-center justify-center">
                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                  </div>
-                 <h2 className="text-lg font-black text-slate-800 uppercase tracking-widest">Antrean Upload</h2>
+                 <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest">Antrean Upload</h2>
                </div>
 
-               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 transition-all hover:border-slate-200 hover:shadow-md">
-                 <div className="flex justify-between items-center mb-4">
+               <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-3 transition-all hover:border-slate-200 hover:shadow-md">
+                 <div className="flex justify-between items-center mb-2">
                    <div className="flex items-center gap-2">
                      <span className="flex h-3 w-3 relative">
                        {uploadQueue.length > 0 && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>}
                        <span className={`relative inline-flex rounded-full h-3 w-3 ${uploadQueue.length > 0 ? "bg-cyan-500" : "bg-slate-300"}`}></span>
                      </span>
-                     <h3 className="text-sm font-bold text-slate-700">Tertunda: {uploadQueue.length} File</h3>
+                     <h3 className="text-[10px] font-bold text-slate-700">Tertunda: {uploadQueue.length} File</h3>
                    </div>
                    {uploadQueue.length > 0 && (
                      <button onClick={handleClearQueue} className="text-[10px] bg-rose-100 text-rose-600 px-3 py-1.5 rounded-lg font-bold hover:bg-rose-200 transition-colors">
@@ -668,7 +682,7 @@ export default function SettingsPage() {
                      {uploadQueue.map((task, idx) => (
                        <div key={task.key || idx} className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center">
                          <div>
-                           <p className="text-xs font-bold text-slate-700 truncate max-w-[150px]" title={task.transaction_id || task.key}>{task.transaction_id || task.key}</p>
+                           <p className="text-[10px] font-bold text-slate-700 truncate max-w-[150px]" title={task.transaction_id || task.key}>{task.transaction_id || task.key}</p>
                            <p className="text-[10px] text-slate-500">Retry: {task.retry_count || 0}/3</p>
                          </div>
                          <div className="text-[10px] text-cyan-600 font-semibold bg-cyan-50 px-2 py-1 rounded-md border border-cyan-100 animate-pulse">
@@ -678,11 +692,11 @@ export default function SettingsPage() {
                      ))}
                    </div>
                  ) : (
-                   <div className="py-6 flex flex-col items-center justify-center text-center">
-                     <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mb-3">
+                   <div className="py-2 flex flex-col items-center justify-center text-center">
+                     <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mb-1.5">
                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                      </div>
-                     <p className="text-xs font-medium text-slate-500">Semua tersinkronisasi</p>
+                     <p className="text-[10px] font-medium text-slate-500">Semua tersinkronisasi</p>
                    </div>
                  )}
                </div>
@@ -699,15 +713,15 @@ export default function SettingsPage() {
         }`}
       >
         <div className="flex justify-between items-center px-6 py-2 bg-slate-200 border-b border-slate-300">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Virtual Keyboard</span>
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Virtual Keyboard</span>
           <button 
             onClick={() => setFocusedInput(null)}
-            className="px-5 py-2 bg-slate-300 text-slate-700 font-bold rounded-lg hover:bg-slate-400 transition-colors text-xs uppercase"
+            className="px-5 py-2 bg-slate-300 text-slate-700 font-bold rounded-lg hover:bg-slate-400 transition-colors text-[10px] uppercase"
           >
             Tutup
           </button>
         </div>
-        <div className="p-4 bg-slate-50 w-full text-black">
+        <div className="p-3 bg-slate-50 w-full text-black">
           <Keyboard
             keyboardRef={r => (keyboardRef.current = r)}
             layoutName={layoutName}

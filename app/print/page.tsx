@@ -253,15 +253,16 @@ function PrintContent() {
       const videoBlob = await localforage.getItem<Blob>("finalLiveVideo");
       if (videoBlob) {
         try {
-          const arrayBuffer = await videoBlob.arrayBuffer();
-          const uint8 = new Uint8Array(arrayBuffer);
-          let binary = '';
-          for (let i = 0; i < uint8.length; i++) {
-            binary += String.fromCharCode(uint8[i]);
-          }
-          const b64 = btoa(binary);
-          const mimeType = videoBlob.type || 'video/webm';
-          payload.videoBase64 = `data:${mimeType};base64,${b64}`;
+          const base64data = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              if (typeof reader.result === 'string') resolve(reader.result);
+              else reject(new Error("FileReader result is not a string"));
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(videoBlob);
+          });
+          payload.videoBase64 = base64data;
         } catch (vidErr) {
           console.warn('[Print] Gagal mengkonversi video ke base64 untuk backup lokal:', vidErr);
         }
@@ -315,11 +316,13 @@ function PrintContent() {
         const template = templates.find((t: any) => t.id.toString() === templateId);
         const frames = template?.frames || [];
 
+        let uploadCount = 0;
         photosToSend.forEach((photo: string, index: number) => {
-          if (photo && frames[index]) {
+          if (photo && frames[index] && uploadCount < 15) {
             const photoBlob = dataUrlToBlob(photo);
-            formData.append(`photos[${index}][image]`, photoBlob, `photo_${index}.jpg`);
-            formData.append(`photos[${index}][frame_id]`, frames[index].id.toString());
+            formData.append(`photos[${uploadCount}][image]`, photoBlob, `photo_${index}.jpg`);
+            formData.append(`photos[${uploadCount}][frame_id]`, frames[index].id.toString());
+            uploadCount++;
           }
         });
 
@@ -417,9 +420,16 @@ function PrintContent() {
       const template = templates.find((t: any) => t.id.toString() === templateId);
       const frames = template?.frames || [];
 
+      let offlineCount = 0;
       const payloadPhotos = photosToSend.map((photo: string, index: number) => {
          return { imageBase64: photo, frame_id: frames[index]?.id?.toString() }
-      }).filter((p: any) => p.imageBase64 && p.frame_id);
+      }).filter((p: any) => {
+         if (p.imageBase64 && p.frame_id && offlineCount < 15) {
+             offlineCount++;
+             return true;
+         }
+         return false;
+      });
 
       const finalVideoBlob = await localforage.getItem<Blob>("finalLiveVideo");
 
@@ -675,6 +685,15 @@ function PrintContent() {
 
     router.push("/");
   };
+
+  // ── Auto Redirect ───────────────────────────────────────
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      handleNewSession();
+    }, 5 * 60 * 1000); // 5 menit
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!finalImage) {
     return (

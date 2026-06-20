@@ -28,7 +28,9 @@ async function handleMidtrans(amount: number, canvas_type: string, server_key: s
     ? 'https://app.midtrans.com/snap/v1/transactions' 
     : 'https://app.sandbox.midtrans.com/snap/v1/transactions';
 
-  const orderId = `ROAM-${Date.now()}`;
+  const rawMachineName = process.env.MACHINE_NAME || 'ROAM';
+  const sanitizedMachineName = rawMachineName.replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-').toUpperCase();
+  const orderId = `${sanitizedMachineName}-${Date.now()}`;
 
   const response = await fetch(midtransUrl, {
     method: 'POST',
@@ -84,9 +86,12 @@ async function handleDoku(amount: number, server_key: string, client_key: string
   const requestId = `REQ-${Date.now()}`;
   const timestamp = new Date().toISOString().split('.')[0] + 'Z'; // Doku expects YYYY-MM-DDTHH:mm:ssZ
   
+    const rawMachineName = process.env.MACHINE_NAME || 'INV';
+    const sanitizedMachineName = rawMachineName.replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-').toUpperCase();
+    
   const body = {
     order: {
-      invoice_number: `INV-${Date.now()}`,
+      invoice_number: `${sanitizedMachineName}-${Date.now()}`,
       amount: amount
     }
   };

@@ -932,6 +932,8 @@ function CameraContent() {
 
                         height: `${(frame.height / template.image_height) * 100}%`,
 
+                        transform: `rotate(${frame.angle || 0}deg)`,
+
                         outline: isCurrent ? "4px solid #f15a09" : "none",
 
                         outlineOffset: "-4px",

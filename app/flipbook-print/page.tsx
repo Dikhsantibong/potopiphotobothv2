@@ -514,6 +514,98 @@ function FlipbookPrintContent() {
   }, [finalCover, generatePrintSheets]);
 
 
+  // ── Helper: Save All Files Locally ─────
+  const saveAllFilesLocally = async () => {
+    try {
+      const storedFinal = localStorage.getItem("flipbook_final_cover");
+      const storedTx = localStorage.getItem("transactionDbId");
+      if (!storedFinal || !storedTx) return;
+
+      const flipbookFrames = await localforage.getItem<string[]>("flipbook_final_frames") || [];
+
+      const payload: any = {
+        transaction_id: storedTx,
+        template_id: templateId,
+        finalImageBase64: storedFinal,
+        rawPhotos: flipbookFrames,
+      };
+
+      // Convert video blob to base64 for the API
+      const videoBlob = await localforage.getItem<Blob>("flipbook_video");
+      if (videoBlob) {
+        try {
+          const base64data = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              if (typeof reader.result === 'string') resolve(reader.result);
+              else reject(new Error("FileReader result is not a string"));
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(videoBlob);
+          });
+          payload.videoBase64 = base64data;
+        } catch (vidErr) {
+          console.warn('[FlipbookPrint] Gagal mengkonversi video ke base64 untuk backup lokal:', vidErr);
+        }
+      }
+
+      await fetch('/api/save-failed-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      console.log(`[FlipbookPrint] Semua file backup lokal disimpan untuk transaksi: ${storedTx}`);
+    } catch (err) {
+      console.error('[FlipbookPrint] Gagal menyimpan backup lokal lengkap:', err);
+    }
+  };
+
+  const handleOfflineFallback = async () => {
+    try {
+      const storedFinalCover = localStorage.getItem("flipbook_final_cover");
+      const storedTxDbId = localStorage.getItem("transactionDbId");
+      if (!storedFinalCover || !storedTxDbId) return;
+
+      const flipbookFrames = await localforage.getItem<string[]>("flipbook_final_frames") || [];
+
+      const payloadPhotos = flipbookFrames.map((photo: string, index: number) => {
+         return { imageBase64: photo, frame_id: index.toString() }
+      }).filter((p: any) => p.imageBase64 && p.imageBase64.length > 100);
+
+      const finalVideoBlob = await localforage.getItem<Blob>("flipbook_video");
+
+      const queueId = "offline_upload_" + Date.now() + "_" + Math.floor(Math.random()*1000);
+      const queueData = {
+        id: queueId,
+        transaction_id: storedTxDbId,
+        template_id: templateId,
+        token_final_image: downloadToken,
+        finalImageBase64: storedFinalCover,
+        photos: payloadPhotos,
+        videoBlob: finalVideoBlob || null,
+        timestamp: Date.now()
+      };
+
+      await localforage.setItem(queueId, queueData);
+      
+      const existingKeys = await localforage.getItem<string[]>("offline_upload_keys") || [];
+      if (!existingKeys.includes(queueId)) {
+         existingKeys.push(queueId);
+         await localforage.setItem("offline_upload_keys", existingKeys);
+      }
+      console.log("[FlipbookPrint] Disimpan ke Offline Upload Queue:", queueId);
+
+      // Langsung simpan semua file ke komputer lokal (tidak mengganggu antrian jika gagal)
+      try {
+        await saveAllFilesLocally();
+      } catch (localSaveErr) {
+        console.error('[FlipbookPrint] Backup lokal gagal, tapi antrian tetap aman:', localSaveErr);
+      }
+    } catch(err) {
+      console.error("[FlipbookPrint] Gagal nge-save Offline Queue", err);
+    }
+  };
+
   // ── Background Upload (fire-and-forget) ────────────────
   const performUpload = useCallback(async () => {
     if (uploadStarted.current) return uploadPromiseRef.current;
@@ -601,6 +693,7 @@ function FlipbookPrintContent() {
           console.error("Flipbook upload failed:", data);
           setUploadError(data.message || "Gagal mengunggah foto/video flipbook");
           setUploadStage("error");
+          await handleOfflineFallback();
           return null;
         }
 
@@ -608,6 +701,13 @@ function FlipbookPrintContent() {
         setFinalImageDbId(id);
         setUploadStage("success");
         setUploadProgress(100);
+
+        // Tetap simpan backup lokal lengkap walaupun upload berhasil (tidak mengganggu alur utama)
+        try {
+          await saveAllFilesLocally();
+        } catch (localErr) {
+          console.error('[FlipbookPrint] Backup lokal gagal setelah upload berhasil (tidak masalah):', localErr);
+        }
 
         // Bersihkan memori berat
         localStorage.removeItem("flipbook_cover");
@@ -620,6 +720,7 @@ function FlipbookPrintContent() {
         console.error("Upload error:", error);
         setUploadError("Terjadi kesalahan sistem saat unggah.");
         setUploadStage("error");
+        await handleOfflineFallback();
         return null;
       }
     })();
@@ -852,6 +953,15 @@ function FlipbookPrintContent() {
     localforage.removeItem("flipbook_print_sheets");
     router.push("/");
   };
+
+  // ── Auto Redirect ───────────────────────────────────────
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      handleNewSession();
+    }, 5 * 60 * 1000); // 5 menit
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── QR Download URL ──────────────────────────────────
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://potopi.site";

@@ -106,6 +106,7 @@ function RenderContent() {
               const y = parseInt(frames[i].y, 10);
               const fw = parseInt(frames[i].width, 10);
               const fh = parseInt(frames[i].height, 10);
+              const angle = frames[i].angle ? parseFloat(frames[i].angle) : 0;
               const imgRatio = img.width / img.height;
               const frameRatio = fw / fh;
 
@@ -117,7 +118,13 @@ function RenderContent() {
                 sh = img.width / frameRatio;
                 sy = (img.height - sh) / 2;
               }
-              ctx.drawImage(img, sx, sy, sw, sh, x, y, fw, fh);
+              
+              ctx.save();
+              ctx.translate(x + fw / 2, y + fh / 2);
+              ctx.rotate((angle * Math.PI) / 180);
+              ctx.drawImage(img, sx, sy, sw, sh, -fw / 2, -fh / 2, fw, fh);
+              ctx.restore();
+              
               resolve();
             };
             img.src = photos[i];
@@ -563,6 +570,7 @@ function RenderContent() {
               const y = parseInt(fr.y, 10);
               const fw = parseInt(fr.width, 10);
               const fh = parseInt(fr.height, 10);
+              const angle = fr.angle ? parseFloat(fr.angle) : 0;
 
               // Hardware crop zoom to hide EOS Webcam Utility black bars
               const CAMERA_ZOOM = 1.08;
@@ -584,11 +592,12 @@ function RenderContent() {
               }
 
               try {
-                // Flip video horizontally agar sesuai dengan foto yang sudah di-mirror
+                // Flip video horizontally agar sesuai dengan foto yang sudah di-mirror and apply rotation
                 ctx.save();
-                ctx.translate(x + fw, y);
+                ctx.translate(x + fw / 2, y + fh / 2);
+                ctx.rotate((angle * Math.PI) / 180);
                 ctx.scale(-1, 1);
-                ctx.drawImage(vid, sx, sy, sw, sh, 0, 0, fw, fh);
+                ctx.drawImage(vid, sx, sy, sw, sh, -fw / 2, -fh / 2, fw, fh);
                 ctx.restore();
               } catch (e) { }
             }

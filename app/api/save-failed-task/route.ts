@@ -5,9 +5,8 @@ import os from 'os';
 
 function saveBase64ToFile(base64: string, filePath: string): boolean {
   try {
-    const matches = base64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) return false;
-    const buffer = Buffer.from(matches[2], 'base64');
+    const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
+    const buffer = Buffer.from(base64Data, 'base64');
     fs.writeFileSync(filePath, buffer);
     return true;
   } catch {
@@ -71,11 +70,10 @@ export async function POST(request: Request) {
     // 4. Simpan Video (dikirim sebagai base64 dari client)
     if (body.videoBase64) {
       try {
-        // Video bisa dikirim sebagai data URL atau raw base64
         let videoBuffer: Buffer;
-        if (body.videoBase64.startsWith('data:')) {
-          const matches = body.videoBase64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-          videoBuffer = Buffer.from(matches![2], 'base64');
+        if (body.videoBase64.includes(',')) {
+          const base64Data = body.videoBase64.split(',')[1];
+          videoBuffer = Buffer.from(base64Data, 'base64');
         } else {
           videoBuffer = Buffer.from(body.videoBase64, 'base64');
         }

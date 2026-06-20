@@ -1035,11 +1035,11 @@ function FlipbookRenderContent() {
           </div>
         </header>
 
-        <main className="flex-1 flex flex-col gap-3 px-4 pb-3 min-h-0 overflow-hidden">
+        <main className="flex-1 flex flex-col gap-2 px-4 pb-2 min-h-0 overflow-hidden">
 
-          <div className="flex-1 flex flex-row gap-4 min-h-0 overflow-hidden">
+          <div className="flex-1 flex flex-col gap-3 min-h-0 overflow-hidden">
 
-            <div className="flex-[1.55] flex flex-col min-h-0 min-w-0 gap-2">
+            <div className="flex-[1.2] flex flex-col min-h-0 min-w-0 gap-1">
 
               <h2 className={`${mochiyPopOne.className} text-white text-sm uppercase tracking-widest text-center shrink-0 drop-shadow-md`}>
                 HASIL FLIPBOOK
@@ -1165,36 +1165,37 @@ function FlipbookRenderContent() {
 
 
 
-            <div className="flex-1 flex flex-row gap-2 min-h-0 min-w-0">
+            <div className="flex-[1] flex flex-row gap-4 min-h-0 min-w-0">
 
-             <div className="w-[88px] shrink-0 flex flex-col min-h-0 gap-2">
+             {/* KIRI: HALAMAN */}
+             <div className="flex-1 flex flex-col min-h-0 min-w-0 gap-2">
 
-                <h2 className={`${mochiyPopOne.className} text-white text-[9px] uppercase tracking-widest text-center shrink-0 drop-shadow-md`}>
+                <h2 className={`${mochiyPopOne.className} text-white text-sm uppercase tracking-widest text-center shrink-0 drop-shadow-md`}>
                    HALAMAN
                 </h2>
 
-             <div className="flex-1 min-h-0 bg-white rounded-[16px] shadow-xl flex flex-col p-2 overflow-hidden border-3 border-white">
-                <div className="flex-1 flex flex-col gap-2 overflow-y-auto pr-0.5" style={{ scrollbarWidth: "none" }}>
+             <div className="flex-1 min-h-0 bg-white rounded-[20px] shadow-xl p-3 overflow-hidden border-3 border-white flex flex-col">
+                <div className="flex-1 overflow-y-auto grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2 pb-1 custom-scrollbar" style={{ scrollbarWidth: "none" }}>
                   {allPreviewFrames.map((frame, idx) => (
                     <div 
                       key={idx} 
                       onClick={() => switchFrame(idx)}
-                      className={`relative w-full aspect-[2/3] shrink-0 rounded-xl overflow-hidden border-4 shadow-md bg-white cursor-pointer transition-all ${selectedFrameIndex === idx ? 'border-[#f15a09] ring-4 ring-[#f15a09]/20 scale-105 z-10' : 'border-white opacity-60 hover:opacity-100 hover:border-orange-200'}`}
+                      className={`relative w-full aspect-[2/3] shrink-0 rounded-xl overflow-hidden border-4 shadow-md bg-white cursor-pointer transition-all ${selectedFrameIndex === idx ? 'border-[#f15a09] ring-4 ring-[#f15a09]/20 scale-105 z-10' : 'border-slate-100 opacity-60 hover:opacity-100 hover:border-orange-200'}`}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img 
                         src={frame} 
                         alt={`Frame ${idx}`} 
-                        className="w-full h-full object-cover"
+                        className="absolute inset-0 w-full h-full object-cover"
                         style={{ filter: previewFilter }}
                       />
                       {/* Show Doodles if they exist for this frame */}
                       {framesData[idx]?.doodle && (
                         /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={framesData[idx].doodle} alt="Doodle" className="absolute inset-0 w-full h-full z-20 pointer-events-none" />
+                        <img src={framesData[idx].doodle} alt="Doodle" className="absolute inset-0 w-full h-full z-20 pointer-events-none object-cover" />
                       )}
                       {/* Page Label */}
-                      <div className={`absolute top-1 left-1 z-30 ${selectedFrameIndex === idx ? 'bg-[#f15a09]' : 'bg-black/30'} backdrop-blur-sm text-white text-[8px] font-black px-1.5 py-0.5 rounded`}>
+                      <div className={`absolute top-1 left-1 z-30 ${selectedFrameIndex === idx ? 'bg-[#f15a09]' : 'bg-black/50'} backdrop-blur-sm text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-sm`}>
                         {idx}
                       </div>
                     </div>
@@ -1206,6 +1207,7 @@ function FlipbookRenderContent() {
 
 
 
+             {/* KANAN: ALAT EDIT */}
              <div className="flex-1 flex flex-col min-h-0 min-w-0 gap-2">
 
                 <h2 className={`${mochiyPopOne.className} text-white text-sm uppercase tracking-widest text-center shrink-0 drop-shadow-md`}>
@@ -1281,7 +1283,7 @@ function FlipbookRenderContent() {
                         return (
                           /* eslint-disable-next-line @next/next/no-img-element */
                           <img key={st.id} src={proxyUrl} alt={st.name} onClick={() => addSticker(st)}
-                            className="w-full h-28 object-contain bg-slate-50 border-4 border-white rounded-2xl p-2 cursor-pointer shadow-sm hover:border-[#f15a09] transition-all active:scale-95" />
+                            className="w-full h-20 object-contain bg-slate-50 border-4 border-white rounded-2xl p-2 cursor-pointer shadow-sm hover:border-[#f15a09] transition-all active:scale-95" />
                         );
                       })
                     )}

@@ -196,6 +196,8 @@ function PembayaranContent() {
   const [isVerifyingVoucher, setIsVerifyingVoucher] = useState(false);
   const [voucherError, setVoucherError] = useState<string | null>(null);
   const [showVoucherKeyboard, setShowVoucherKeyboard] = useState(false);
+  const [appliedVoucherId, setAppliedVoucherId] = useState<number | null>(null);
+  const [discountPercentage, setDiscountPercentage] = useState<number>(0);
   const keyboardRef = useRef<any>(null);
 
   // Background QRIS states
@@ -227,7 +229,8 @@ function PembayaranContent() {
     }
   }, []);
 
-  const basePrice = pricingData ? pricingData[`amount_${canvasType}`] || 0 : 0;
+  const originalPrice = pricingData ? pricingData[`amount_${canvasType}`] || 0 : 0;
+  const basePrice = Math.max(0, originalPrice - (originalPrice * (discountPercentage / 100)));
   const gatewayName = pricingData?.name || "QRIS";
 
   // ── Helper: Start New Session Timer ──
@@ -342,7 +345,7 @@ function PembayaranContent() {
           setIsQrisModalOpen(true);
 
           // Buat transaksi di backend saat pembayaran QRIS berhasil
-          await createTransaction("qris");
+          await createTransaction("qris", appliedVoucherId);
 
           // Reset Timer Sesi Baru
           startNewSession();
@@ -449,17 +452,25 @@ function PembayaranContent() {
       if (response.ok && result.valid) {
         // Ambil voucher_id dari response backend (result.data.voucher_id)
         const voucherId = result.data?.voucher_id || null;
+        const discount = result.data?.discount_percentage ?? 100;
 
-        // Buat transaksi di backend saat voucher valid (amount 0 karena pakai voucher)
-        await createTransaction("voucher", voucherId);
-
-        // Reset Timer Sesi Baru
-        startNewSession();
-
-        // Fetch templates sekaligus saat voucher valid
-        await fetchAndStoreTemplates();
-        setIsVoucherModalOpen(false);
-        router.push("/template?kanvas=" + canvasType);
+        if (discount === 100) {
+          // Diskon 100% (Gratis)
+          // Temporarily set basePrice to 0 by setting discountPercentage to 100
+          setDiscountPercentage(100);
+          setAppliedVoucherId(voucherId);
+          await createTransaction("voucher", voucherId);
+          startNewSession();
+          await fetchAndStoreTemplates();
+          setIsVoucherModalOpen(false);
+          router.push("/template?kanvas=" + canvasType);
+        } else {
+          // Diskon sebagian (misal 50%)
+          setDiscountPercentage(discount);
+          setAppliedVoucherId(voucherId);
+          setIsVoucherModalOpen(false);
+          setIsQrisModalOpen(true); // Buka QRIS untuk sisa pembayaran
+        }
       } else {
         setVoucherError(result.message || "Kode voucher tidak valid!");
       }
@@ -557,9 +568,21 @@ function PembayaranContent() {
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
                 {getCanvasName(canvasType)}
               </p>
-              <p className="text-xl font-black tabular-nums text-slate-900 sm:text-2xl">
-                {formatPrice(basePrice)}
-              </p>
+              <div className="flex items-center gap-2">
+                {discountPercentage > 0 && (
+                  <p className="text-sm font-bold text-slate-400 line-through">
+                    {formatPrice(originalPrice)}
+                  </p>
+                )}
+                <p className="text-xl font-black tabular-nums text-slate-900 sm:text-2xl">
+                  {formatPrice(basePrice)}
+                </p>
+              </div>
+              {discountPercentage > 0 && (
+                <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">
+                  Diskon {discountPercentage}% Terpakai
+                </p>
+              )}
             </div>
           </div>
 
@@ -593,7 +616,11 @@ function PembayaranContent() {
                 Gunakan voucher
               </h3>
               <p className="mt-2 text-[10px] font-medium leading-snug text-slate-600 sm:text-[11px]">
-                {voucherCode.length === 8 ? (
+                {appliedVoucherId ? (
+                  <span className="font-bold text-emerald-500">
+                    Voucher diterapkan ({discountPercentage}%)
+                  </span>
+                ) : voucherCode.length === 8 ? (
                   <span className="tracking-[0.2em] font-bold text-slate-800">
                     {voucherCode}
                   </span>

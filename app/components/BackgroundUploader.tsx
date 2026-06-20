@@ -97,15 +97,16 @@ export default function BackgroundUploader() {
             // Sertakan video jika ada (konversi blob ke base64)
             if (task.videoBlob && task.videoBlob instanceof Blob) {
               try {
-                const arrayBuffer = await task.videoBlob.arrayBuffer();
-                const uint8 = new Uint8Array(arrayBuffer);
-                let binary = '';
-                for (let i = 0; i < uint8.length; i++) {
-                  binary += String.fromCharCode(uint8[i]);
-                }
-                const b64 = btoa(binary);
-                const mimeType = task.videoBlob.type || 'video/webm';
-                backupPayload.videoBase64 = `data:${mimeType};base64,${b64}`;
+                const base64data = await new Promise<string>((resolve, reject) => {
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                    if (typeof reader.result === 'string') resolve(reader.result);
+                    else reject(new Error("FileReader result is not a string"));
+                  };
+                  reader.onerror = reject;
+                  reader.readAsDataURL(task.videoBlob);
+                });
+                backupPayload.videoBase64 = base64data;
               } catch (vidErr) {
                 console.warn('[BackgroundUploader] Gagal konversi video untuk backup lokal:', vidErr);
               }
@@ -182,12 +183,14 @@ export default function BackgroundUploader() {
     formData.append("image", dataUrlToBlob(task.finalImageBase64), "final.jpg");
 
     // Foto per frame
+    let uploadCount = 0;
     if (task.photos && Array.isArray(task.photos)) {
       task.photos.forEach((photo: any, index: number) => {
-        if (photo.imageBase64 && photo.frame_id) {
+        if (photo.imageBase64 && photo.frame_id && uploadCount < 15) {
           const photoBlob = dataUrlToBlob(photo.imageBase64);
-          formData.append(`photos[${index}][image]`, photoBlob, `photo_${index}.jpg`);
-          formData.append(`photos[${index}][frame_id]`, photo.frame_id);
+          formData.append(`photos[${uploadCount}][image]`, photoBlob, `photo_${uploadCount}.jpg`);
+          formData.append(`photos[${uploadCount}][frame_id]`, photo.frame_id);
+          uploadCount++;
         }
       });
     }
