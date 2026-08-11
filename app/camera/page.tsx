@@ -156,7 +156,7 @@ function CameraContent() {
 
     try {
 
-      const storedTemplates = localStorage.getItem("templates");
+      const storedTemplates = localStorage.getItem(`templates_${canvasType}`);
 
       const storedBaseUrl = localStorage.getItem("templates_base_url") || "";
 
@@ -767,9 +767,15 @@ function CameraContent() {
 
 
               {/* Flash Overlay */}
-
               {flashActive && <div className="absolute inset-0 bg-white z-50 animate-out fade-out duration-300"></div>}
 
+              {/* Session Timer */}
+              <div className="absolute top-4 right-4 z-40 flex items-center gap-2 bg-white/30 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/50 shadow-[0_0_15px_rgba(0,0,0,0.2)] transition-all">
+                <div className="w-2 h-2 rounded-full bg-[#f15a09] animate-pulse"></div>
+                <span className="text-white font-black text-base tabular-nums tracking-wider drop-shadow-md">
+                  {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                </span>
+              </div>
             </div>
 
 
@@ -1119,20 +1125,6 @@ function CameraContent() {
                   </div>
 
                 </div>
-
-              </div>
-
-
-
-              <div className="shrink-0 flex items-center gap-2 bg-orange-50 px-4 py-2 rounded-full border-2 border-[#f15a09]/20">
-
-                <div className="w-2 h-2 rounded-full bg-[#f15a09] animate-pulse"></div>
-
-                <span className="text-[#f15a09] font-black text-lg tabular-nums tracking-wider">
-
-                  {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-
-                </span>
 
               </div>
 

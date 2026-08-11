@@ -4,6 +4,7 @@ const { createServer } = require('http');
 const { parse } = require('url');
 const next = require('next');
 const fs = require('fs');
+const { autoUpdater } = require('electron-updater');
 
 const dev = !app.isPackaged;
 
@@ -100,6 +101,34 @@ ipcMain.on('close-app', () => {
   app.quit();
 });
 
+// ── Auto Updater Handlers ─────────────────────────────────
+ipcMain.handle('check-update', async () => {
+  if (dev) {
+    return { success: false, error: "Auto-updater only works in production builds." };
+  }
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    return { success: true, result };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.on('download-update', () => {
+  autoUpdater.downloadUpdate();
+});
+
+ipcMain.on('install-update', () => {
+  autoUpdater.quitAndInstall(false, true);
+});
+
+// Forward updater events to renderer
+function forwardUpdateEvent(win, eventName, data) {
+  if (win && !win.isDestroyed()) {
+    win.webContents.send(eventName, data);
+  }
+}
+
 app.whenReady().then(async () => {
   // Load environment variables before starting Next.js
   loadEnv();
@@ -130,6 +159,17 @@ app.whenReady().then(async () => {
       server.listen(port, () => {
         console.log(`> Next.js Server ready on http://${hostname}:${port}`);
         createWindow();
+        
+        // Auto updater configuration
+        autoUpdater.autoDownload = false;
+        autoUpdater.autoInstallOnAppQuit = false;
+
+        const win = BrowserWindow.getAllWindows()[0];
+        autoUpdater.on('update-available', (info) => forwardUpdateEvent(win, 'update-available', info));
+        autoUpdater.on('update-not-available', (info) => forwardUpdateEvent(win, 'update-not-available', info));
+        autoUpdater.on('error', (err) => forwardUpdateEvent(win, 'update-error', err.message));
+        autoUpdater.on('download-progress', (progressObj) => forwardUpdateEvent(win, 'download-progress', progressObj));
+        autoUpdater.on('update-downloaded', (info) => forwardUpdateEvent(win, 'update-downloaded', info));
       });
     } catch (err) {
       console.error('Next.js prepare failed:', err);

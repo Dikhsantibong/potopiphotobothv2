@@ -945,9 +945,6 @@ function FlipbookPrintContent() {
   const handleNewSession = () => {
     localStorage.removeItem("flipbook_final_cover");
     localStorage.removeItem("flipbook_coverEdit");
-    localStorage.removeItem("templates");
-    localStorage.removeItem("templates_base_url");
-    localStorage.removeItem("stickers");
     localStorage.removeItem("transactionDbId");
     localStorage.removeItem("transactionId");
     localforage.removeItem("flipbook_print_sheets");

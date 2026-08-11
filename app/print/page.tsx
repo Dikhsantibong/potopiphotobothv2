@@ -218,7 +218,7 @@ function PrintContent() {
       if (raw) setRawPhotos(JSON.parse(raw));
 
       // Read template category
-      const templatesRaw = localStorage.getItem("templates");
+      const templatesRaw = localStorage.getItem(`templates_${canvasType}`);
       if (templatesRaw) {
         try {
           const templates = JSON.parse(templatesRaw);
@@ -306,7 +306,7 @@ function PrintContent() {
         // ── Tambahkan Foto-Foto Per Frame ──
         const capturedPhotosRaw = localStorage.getItem("capturedPhotos");
         const rawPhotosRaw = localStorage.getItem("rawPhotos");
-        const templatesRaw = localStorage.getItem("templates");
+        const templatesRaw = localStorage.getItem(`templates_${canvasType}`);
         
         const capturedPhotos = JSON.parse(capturedPhotosRaw || "[]");
         const rawPhotos = JSON.parse(rawPhotosRaw || "[]");
@@ -411,7 +411,7 @@ function PrintContent() {
 
       const capturedPhotosRaw = localStorage.getItem("capturedPhotos");
       const rawPhotosRaw = localStorage.getItem("rawPhotos");
-      const templatesRaw = localStorage.getItem("templates");
+      const templatesRaw = localStorage.getItem(`templates_${canvasType}`);
       
       const capturedPhotos = JSON.parse(capturedPhotosRaw || "[]");
       const rawPhotos = JSON.parse(rawPhotosRaw || "[]");
@@ -535,7 +535,7 @@ function PrintContent() {
         
         let cat = templateCategory.toUpperCase();
         if (!cat) {
-          const templatesRaw = localStorage.getItem("templates");
+          const templatesRaw = localStorage.getItem(`templates_${canvasType}`);
           if (templatesRaw) {
              try {
                const templates = JSON.parse(templatesRaw);
@@ -668,9 +668,6 @@ function PrintContent() {
       "rawPhotos",
       "capturedPhotos",
       "frameEdits",
-      "templates",
-      "templates_base_url",
-      "stickers",
       "transactionDbId",
       "transactionId",
       "session_expiry",

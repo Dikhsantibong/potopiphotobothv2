@@ -350,9 +350,6 @@ function PembayaranContent() {
           // Reset Timer Sesi Baru
           startNewSession();
 
-          // Fetch templates sekaligus saat pembayaran sukses
-          await fetchAndStoreTemplates();
-
           setTimeout(() => {
             router.push("/template?kanvas=" + canvasType);
           }, 2000);
@@ -412,28 +409,6 @@ function PembayaranContent() {
     }
   };
 
-  // Fungsi untuk fetch templates & stickers dan simpan ke localStorage
-  const fetchAndStoreTemplates = async () => {
-    try {
-      const [resTemplates, resStickers] = await Promise.all([
-        fetch(`/api/templates?type=${canvasType}`),
-        fetch(`/api/stickers`)
-      ]);
-      
-      const resultTemplates = await resTemplates.json();
-      if (resultTemplates.success) {
-        localStorage.setItem("templates", JSON.stringify(resultTemplates.data));
-        localStorage.setItem("templates_base_url", resultTemplates.base_url || "");
-      }
-
-      const resultStickers = await resStickers.json();
-      if (resultStickers.success) {
-        localStorage.setItem("stickers", JSON.stringify(resultStickers.data));
-      }
-    } catch (e) {
-      console.error("Failed to prefetch templates or stickers:", e);
-    }
-  };
 
   const handleVoucherSubmit = async () => {
     if (voucherCode.length < 8) return;
@@ -461,7 +436,6 @@ function PembayaranContent() {
           setAppliedVoucherId(voucherId);
           await createTransaction("voucher", voucherId);
           startNewSession();
-          await fetchAndStoreTemplates();
           setIsVoucherModalOpen(false);
           router.push("/template?kanvas=" + canvasType);
         } else {

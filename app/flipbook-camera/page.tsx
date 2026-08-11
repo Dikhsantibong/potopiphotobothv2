@@ -668,7 +668,7 @@ function FlipbookCameraContent() {
 
 
 
-    const storedTemplatesJSON = localStorage.getItem("templates");
+    const storedTemplatesJSON = localStorage.getItem("templates_flipbook");
 
     const templates: any[] = storedTemplatesJSON ? JSON.parse(storedTemplatesJSON) : [];
 

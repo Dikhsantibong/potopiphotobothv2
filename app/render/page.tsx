@@ -53,7 +53,7 @@ function RenderContent() {
     const processImages = async () => {
       try {
         const storedPhotosJSON = localStorage.getItem("capturedPhotos");
-        const storedTemplatesJSON = localStorage.getItem("templates");
+        const storedTemplatesJSON = localStorage.getItem(`templates_${canvasType}`);
         const storedStickersJSON = localStorage.getItem("stickers");
         const storedBaseUrl = localStorage.getItem("templates_base_url") || "";
 
@@ -420,7 +420,7 @@ function RenderContent() {
     setIsRenderingVideo(true);
 
     try {
-      const storedTemplatesJSON = localStorage.getItem("templates");
+      const storedTemplatesJSON = localStorage.getItem(`templates_${canvasType}`);
       const frames = storedTemplatesJSON ? JSON.parse(storedTemplatesJSON).find((t: any) => t.id.toString() === templateId)?.frames || [] : [];
       let liveVideos: Blob[] | null = null;
       try {
@@ -847,7 +847,7 @@ function RenderContent() {
         <footer className="shrink-0 flex items-center justify-center gap-3 px-6 py-3">
            <button
              onClick={() => {
-               const storedTemplatesJSON = localStorage.getItem("templates");
+               const storedTemplatesJSON = localStorage.getItem(`templates_${canvasType}`);
                let frameCount = 4;
                if (storedTemplatesJSON) {
                  const tpls = JSON.parse(storedTemplatesJSON);

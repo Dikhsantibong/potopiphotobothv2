@@ -1,0 +1,35 @@
+name: Build and Release Electron App
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger workflow on version tags, e.g., v1.0.0, v1.0.1
+
+jobs:
+  release:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v3
+
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Next.js
+        run: npm run build
+
+      - name: Build and Publish Electron App
+        uses: samuelmeuli/action-electron-builder@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          release: true
+          build_script_name: false
+        env:
+          # This token is automatically provided by GitHub Actions
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

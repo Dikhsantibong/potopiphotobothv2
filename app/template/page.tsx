@@ -77,7 +77,7 @@ function TemplateContent() {
 
   useEffect(() => {
     try {
-      const storedTemplates = localStorage.getItem("templates");
+      const storedTemplates = localStorage.getItem(`templates_${canvasType}`);
       const storedBaseUrl = localStorage.getItem("templates_base_url");
 
       if (storedTemplates) {

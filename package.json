@@ -4,6 +4,10 @@
   "private": true,
   "main": "main.js",
   "author": "RoamBooth",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Dikhsantibong/potopiphotobothv2.git"
+  },
   "description": "RoamBooth Machine Application",
   "scripts": {
     "dev": "next dev",
@@ -17,6 +21,7 @@
     "@ffmpeg/core": "^0.12.6",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
+    "electron-updater": "^6.8.9",
     "ffmpeg-static": "^5.3.0",
     "fluent-ffmpeg": "^2.1.3",
     "localforage": "^1.10.0",
@@ -42,7 +47,12 @@
     "wait-on": "^9.0.4"
   },
   "build": {
-    "compression": "maximum",
+    "publish": [{
+      "provider": "github",
+      "owner": "Dikhsantibong",
+      "repo": "potopiphotobothv2"
+    }],
+    "compression": "store",
     "appId": "com.roambooth.machine1",
     "productName": "RoamBooth Machine",
     "directories": {
@@ -54,6 +64,8 @@
       ".next/**/*",
       "!.next/cache/**/*",
       "!.next/cache",
+      "!.next/dev/**/*",
+      "!.next/dev",
       "!**/*.map",
       "public/**/*",
       ".env",

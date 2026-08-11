@@ -97,7 +97,7 @@ function FlipbookRenderContent() {
       try {
         const storedCover = localStorage.getItem("flipbook_cover");
         const storedCoverEdit = localStorage.getItem("flipbook_coverEdit");
-        const storedTemplatesJSON = localStorage.getItem("templates");
+        const storedTemplatesJSON = localStorage.getItem("templates_flipbook");
         const storedStickersJSON = localStorage.getItem("stickers");
         const storedBaseUrl = localStorage.getItem("templates_base_url") || "";
 
@@ -603,7 +603,7 @@ function FlipbookRenderContent() {
     );
 
     try {
-      const storedTemplatesJSON = localStorage.getItem("templates");
+      const storedTemplatesJSON = localStorage.getItem("templates_flipbook");
       const templates = storedTemplatesJSON ? JSON.parse(storedTemplatesJSON) : [];
       const templateObj = templates.find((t: any) => t.id.toString() === templateId);
       const frames = templateObj?.frames || [];
