@@ -10,6 +10,8 @@ import localforage from "localforage";
 
 import { Mochiy_Pop_One } from "next/font/google";
 
+import { useCamera } from "../hooks/useCamera";
+
 
 
 const mochiyPopOne = Mochiy_Pop_One({
@@ -259,6 +261,30 @@ function FlipbookCameraContent() {
     return () => stopCamera();
 
   }, [startCamera, stopCamera]);
+
+
+
+  // Flipbook selalu memakai webcam (butuh MediaStream untuk MediaRecorder —
+
+  // digiCamControl tidak menyediakannya). Hook dipakai hanya untuk mengunci
+
+  // perpindahan provider selama sesi dan mendaftarkan kontrol stream ke Main.
+
+  useCamera({
+
+    markSessionActive: true,
+
+    webcamControls: {
+
+      start: startCamera,
+
+      stop: stopCamera,
+
+      isStreaming: () => !!streamRef.current,
+
+    },
+
+  });
 
 
 

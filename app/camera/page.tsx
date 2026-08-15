@@ -10,6 +10,8 @@ import localforage from "localforage";
 
 import { Mochiy_Pop_One } from "next/font/google";
 
+import { useCamera } from "../hooks/useCamera";
+
 
 
 const mochiyPopOne = Mochiy_Pop_One({
@@ -380,13 +382,88 @@ function CameraContent() {
 
 
 
+  // Provider kamera aktif (webcam / digicamcontrol). UI di bawah tidak peduli
+  // yang mana — hanya jalur pengambilan gambarnya yang berbeda.
+
+  const {
+
+    providerReady,
+
+    usesWebcam,
+
+    liveViewUrl,
+
+    liveViewState,
+
+    startLiveView,
+
+    stopLiveView,
+
+    capture: providerCapture,
+
+    isCapturing,
+
+    error: cameraError,
+
+  } = useCamera({
+
+    markSessionActive: true,
+
+    autoStart: false,
+
+    webcamControls: {
+
+      start: startCamera,
+
+      stop: stopCamera,
+
+      isStreaming: () => !!streamRef.current,
+
+    },
+
+  });
+
+
+
   useEffect(() => {
+
+    if (!providerReady || !usesWebcam) return;
 
     startCamera();
 
     return () => stopCamera();
 
-  }, [startCamera, stopCamera]);
+  }, [providerReady, usesWebcam, startCamera, stopCamera]);
+
+
+
+  // Jalur digiCamControl: live view via frame JPEG dari Main Process.
+
+  useEffect(() => {
+
+    if (!providerReady || usesWebcam) return;
+
+    let cancelled = false;
+
+    (async () => {
+
+      const res = await startLiveView();
+
+      if (!cancelled && res?.ok) setCameraReady(true);
+
+    })();
+
+    return () => {
+
+      cancelled = true;
+
+      setCameraReady(false);
+
+      void stopLiveView();
+
+    };
+
+  }, [providerReady, usesWebcam, startLiveView, stopLiveView]);
 
 
 
@@ -471,6 +548,130 @@ function CameraContent() {
     setTimeout(() => setFlashActive(false), 150);
 
     setShowPreview(true);
+
+  };
+
+
+
+  // Jalur digiCamControl: JPEG datang dari kamera lewat Main Process, lalu
+  // diproses dengan crop/mirror yang SAMA persis dengan jalur webcam supaya
+  // hasil akhirnya identik untuk template, print, dan upload.
+
+  const [captureError, setCaptureError] = useState<string | null>(null);
+
+
+
+  const processProviderJpeg = (dataUrl: string) =>
+
+    new Promise<string>((resolve, reject) => {
+
+      const img = new Image();
+
+      img.onload = () => {
+
+        const canvas = canvasRef.current || document.createElement("canvas");
+
+        canvas.width = img.naturalWidth;
+
+        canvas.height = img.naturalHeight;
+
+        const ctx = canvas.getContext("2d");
+
+        if (!ctx) { reject(new Error("Canvas tidak tersedia")); return; }
+
+
+
+        const CAMERA_ZOOM = 1.08;
+
+        const w = canvas.width;
+
+        const h = canvas.height;
+
+        const sw = w / CAMERA_ZOOM;
+
+        const sh = h / CAMERA_ZOOM;
+
+        const sx = (w - sw) / 2;
+
+        const sy = (h - sh) / 2;
+
+
+
+        if (isMirrored) {
+
+          ctx.translate(w, 0);
+
+          ctx.scale(-1, 1);
+
+        }
+
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+
+        if (isMirrored) ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+
+
+        resolve(canvas.toDataURL("image/jpeg", 0.95));
+
+      };
+
+      img.onerror = () => reject(new Error("Foto tidak dapat dibaca"));
+
+      img.src = dataUrl;
+
+    });
+
+
+
+  const captureFromProvider = async () => {
+
+    setCaptureError(null);
+
+    const res = await providerCapture();
+
+    if (!res?.ok || !res.dataUrl) {
+
+      setCaptureError(res?.error || "Kamera tidak merespon, coba lagi");
+
+      return;
+
+    }
+
+    try {
+
+      const processed = await processProviderJpeg(res.dataUrl);
+
+      setPhotos((prev) => {
+
+        const u = [...prev];
+
+        u[currentFrame] = processed;
+
+        return u;
+
+      });
+
+      setFlashActive(true);
+
+      setTimeout(() => setFlashActive(false), 150);
+
+      setShowPreview(true);
+
+    } catch (e) {
+
+      setCaptureError((e as Error).message);
+
+    }
+
+  };
+
+
+
+  const doCapture = () => {
+
+    if (usesWebcam) { capturePhoto(); return; }
+
+    void captureFromProvider();
 
   };
 
@@ -612,7 +813,7 @@ function CameraContent() {
 
     }
 
-    if (countdown === 0) { capturePhoto(); setCountdown(null); return; }
+    if (countdown === 0) { doCapture(); setCountdown(null); return; }
 
     const t = setTimeout(() => setCountdown(p => p !== null ? p - 1 : null), 1000);
 
@@ -712,25 +913,65 @@ function CameraContent() {
 
             <div className="absolute inset-0 bg-slate-900 overflow-hidden">
 
-              <video
+              {usesWebcam ? (
 
-                ref={videoRef}
+                <video
 
-                autoPlay playsInline muted
+                  ref={videoRef}
 
-                className={`absolute inset-0 w-full h-full transition-opacity ${showPreview ? "opacity-0" : "opacity-100"}`}
+                  autoPlay playsInline muted
 
-                style={{
+                  className={`absolute inset-0 w-full h-full transition-opacity ${showPreview ? "opacity-0" : "opacity-100"}`}
 
-                  objectFit: 'cover',
+                  style={{
 
-                  transform: `scaleX(${isMirrored ? -1 : 1}) scale(1.08)`,
+                    objectFit: 'cover',
 
-                  filter: !showPreview ? getFilterStyle() : ""
+                    transform: `scaleX(${isMirrored ? -1 : 1}) scale(1.08)`,
 
-                }}
+                    filter: !showPreview ? getFilterStyle() : ""
 
-              />
+                  }}
+
+                />
+
+              ) : liveViewUrl ? (
+
+                <img
+
+                  src={liveViewUrl}
+
+                  alt="Live view"
+
+                  className={`absolute inset-0 w-full h-full transition-opacity ${showPreview ? "opacity-0" : "opacity-100"}`}
+
+                  style={{
+
+                    objectFit: 'cover',
+
+                    transform: `scaleX(${isMirrored ? -1 : 1}) scale(1.08)`,
+
+                    filter: !showPreview ? getFilterStyle() : ""
+
+                  }}
+
+                />
+
+              ) : (
+
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/70">
+
+                  <div className="w-10 h-10 border-4 border-white/40 border-t-transparent rounded-full animate-spin"></div>
+
+                  <span className="text-[10px] font-black uppercase tracking-widest">
+
+                    {liveViewState === "error" ? "Kamera tidak terhubung" : "Menyiapkan kamera..."}
+
+                  </span>
+
+                </div>
+
+              )}
 
 
 
@@ -768,6 +1009,23 @@ function CameraContent() {
 
               {/* Flash Overlay */}
               {flashActive && <div className="absolute inset-0 bg-white z-50 animate-out fade-out duration-300"></div>}
+
+              {/* Menunggu kamera DSLR menulis file (hanya provider digiCamControl) */}
+              {isCapturing && (
+                <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-black/40 backdrop-blur-sm">
+                  <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-white font-black text-[11px] uppercase tracking-widest">Mengambil foto...</span>
+                </div>
+              )}
+
+              {/* Error kamera (timeout / provider tidak terhubung) */}
+              {(captureError || (!usesWebcam && cameraError)) && (
+                <div className="absolute top-4 left-4 right-24 z-40 bg-rose-600/95 text-white px-4 py-2 rounded-xl shadow-lg">
+                  <p className="text-[10px] font-black uppercase tracking-widest leading-relaxed">
+                    {captureError || cameraError}
+                  </p>
+                </div>
+              )}
 
               {/* Session Timer */}
               <div className="absolute top-4 right-4 z-40 flex items-center gap-2 bg-white/30 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/50 shadow-[0_0_15px_rgba(0,0,0,0.2)] transition-all">
@@ -808,7 +1066,7 @@ function CameraContent() {
 
                   <button
 
-                    onClick={() => { if (cameraReady && countdown === null) setCountdown(3); }}
+                    onClick={() => { if (cameraReady && countdown === null && !isCapturing) setCountdown(3); }}
 
                     className="w-20 h-20 rounded-full bg-white/90 backdrop-blur-md border-[6px] border-[#f15a09] flex items-center justify-center text-[#f15a09] shadow-2xl hover:scale-110 active:scale-95 transition-all group"
 
@@ -950,7 +1208,7 @@ function CameraContent() {
 
                     >
 
-                      {isCurrent && !showPreview ? (
+                      {isCurrent && !showPreview && usesWebcam ? (
 
                         <video
 
@@ -969,6 +1227,20 @@ function CameraContent() {
                             }
 
                           }}
+
+                        />
+
+                      ) : isCurrent && !showPreview && liveViewUrl ? (
+
+                        <img
+
+                          src={liveViewUrl}
+
+                          alt=""
+
+                          className="absolute inset-0 w-full h-full"
+
+                          style={{ objectFit: 'cover', transform: `scaleX(${isMirrored ? -1 : 1}) scale(1.08)`, filter: getFilterStyle() }}
 
                         />
 

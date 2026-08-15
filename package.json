@@ -1,9 +1,9 @@
 {
-  "name": "my-app",
-  "version": "0.1.0",
+  "name": "potopi-photobooth",
+  "version": "0.1.1",
   "private": true,
   "main": "main.js",
-  "author": "RoamBooth",
+  "author": "CtechAgency",
   "repository": {
     "type": "git",
     "url": "https://github.com/Dikhsantibong/potopiphotobothv2.git"
@@ -15,7 +15,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "dist": "npm run build && electron-builder"
+    "dist": "npm run build && electron-builder",
+    "test:digicam": "node scripts/test-digicam.mjs",
+    "test:camera-config": "node scripts/test-camera-config.mjs"
   },
   "dependencies": {
     "@ffmpeg/core": "^0.12.6",
@@ -61,6 +63,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "electron/**/*",
       ".next/**/*",
       "!.next/cache/**/*",
       "!.next/cache",
@@ -70,7 +73,14 @@
       "public/**/*",
       ".env",
       "package.json",
-      "node_modules/**/*"
+      "node_modules/**/*",
+      "!node_modules/electron{,/**/*}",
+      "!node_modules/electron-builder{,/**/*}",
+      "!node_modules/app-builder-bin{,/**/*}",
+      "!node_modules/7zip-bin{,/**/*}",
+      "!node_modules/typescript{,/**/*}",
+      "!node_modules/@types{,/**/*}",
+      "!node_modules/eslint*{,/**/*}"
     ],
     "win": {
       "target": "nsis",

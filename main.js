@@ -5,8 +5,12 @@ const { parse } = require('url');
 const next = require('next');
 const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
+const { registerCameraIpc, defaultSessionRoot } = require('./electron/camera/ipc');
 
 const dev = !app.isPackaged;
+
+/** @type {import('./electron/camera/CameraProviderManager').CameraProviderManager|null} */
+let cameraManager = null;
 
 // ── Manual .env Loading ──────────────────────────────────
 // In production, Next.js might not load .env from the root folder correctly.
@@ -122,6 +126,19 @@ ipcMain.on('install-update', () => {
   autoUpdater.quitAndInstall(false, true);
 });
 
+// ── Camera Provider (digiCamControl / EOS Webcam Utility) ─────
+function setupCamera() {
+  const sessionRoot = defaultSessionRoot(app.getPath('userData'));
+  cameraManager = registerCameraIpc({
+    ipcMain,
+    getWindow: () => BrowserWindow.getAllWindows()[0] || null,
+    sessionRoot,
+  });
+  cameraManager.init().catch((err) => {
+    console.error('> Camera provider init failed:', err);
+  });
+}
+
 // Forward updater events to renderer
 function forwardUpdateEvent(win, eventName, data) {
   if (win && !win.isDestroyed()) {
@@ -132,6 +149,10 @@ function forwardUpdateEvent(win, eventName, data) {
 app.whenReady().then(async () => {
   // Load environment variables before starting Next.js
   loadEnv();
+
+  // Harus setelah loadEnv(): pilihan provider dibaca dari .env mutable
+  // yang path-nya diumumkan lewat process.env.MUTABLE_ENV_PATH.
+  setupCamera();
 
   if (!dev) {
     try {
@@ -184,6 +205,12 @@ app.whenReady().then(async () => {
       createWindow();
     }
   });
+});
+
+app.on('before-quit', () => {
+  if (cameraManager) {
+    cameraManager.shutdown().catch(() => { });
+  }
 });
 
 app.on('window-all-closed', () => {

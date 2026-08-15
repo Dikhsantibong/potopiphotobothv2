@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import localforage from "localforage";
 import dynamic from "next/dynamic";
 import "react-simple-keyboard/build/css/index.css";
+import { getCameraBridge, type CameraProvider, type CameraStatus } from "../hooks/useCamera";
 
 const Keyboard = dynamic(() => import("react-simple-keyboard"), { ssr: false });
 
@@ -37,6 +38,11 @@ export default function SettingsPage() {
     flipbook: true
   });
   const [sessionTimeout, setSessionTimeout] = useState<number>(300);
+
+  // Camera provider states
+  const [cameraProvider, setCameraProvider] = useState<CameraProvider>("webcam");
+  const [providerStatus, setProviderStatus] = useState<{ connected: boolean; error?: string; detail?: string } | null>(null);
+  const [providerBusy, setProviderBusy] = useState(false);
 
   // Queue state
   const [uploadQueue, setUploadQueue] = useState<any[]>([]);
@@ -101,6 +107,77 @@ export default function SettingsPage() {
       showToast("Antrean berhasil dihapus!", "success");
     } catch (e) {
       showToast("Gagal menghapus antrean", "error");
+    }
+  };
+
+  // ── Camera provider ────────────────────────────────────────
+  const refreshProviderStatus = useCallback(async () => {
+    const api = getCameraBridge();
+    if (!api) return;
+    try {
+      const status = await api.getStatus();
+      setProviderStatus({
+        connected: !!status?.connected,
+        error: status?.error,
+        detail:
+          status?.provider === "digicamcontrol"
+            ? [status?.baseUrl as string | undefined, status?.cameraDetected ? "kamera terdeteksi" : null]
+                .filter(Boolean)
+                .join(" · ")
+            : status?.idle
+              ? "Halaman kamera belum aktif"
+              : typeof status?.videoInputs === "number"
+                ? `${status.videoInputs} perangkat video terdeteksi`
+                : undefined,
+      });
+    } catch (e) {
+      setProviderStatus({ connected: false, error: (e as Error).message });
+    }
+  }, []);
+
+  const fetchProvider = useCallback(async () => {
+    const api = getCameraBridge();
+    if (!api) return;
+    try {
+      const name = await api.getProvider();
+      if (name) setCameraProvider(name);
+    } catch {
+      /* biarkan default */
+    }
+    await refreshProviderStatus();
+  }, [refreshProviderStatus]);
+
+  const handleSelectProvider = async (name: CameraProvider) => {
+    const api = getCameraBridge();
+    if (!api) {
+      showToast("Pergantian sumber kamera hanya tersedia di aplikasi desktop", "error");
+      return;
+    }
+    if (name === cameraProvider || providerBusy) return;
+
+    setProviderBusy(true);
+    try {
+      const res = await api.setProvider(name);
+      if (res?.ok) {
+        setCameraProvider(name);
+        setProviderStatus({ connected: !!res.connected, error: undefined });
+        showToast(
+          name === "digicamcontrol"
+            ? "Sumber kamera: DigiCamControl aktif"
+            : "Sumber kamera: Webcam Utility aktif",
+          "success"
+        );
+      } else {
+        // Gagal → main process sudah rollback ke provider sebelumnya.
+        setCameraProvider(res?.rolledBackTo || res?.provider || cameraProvider);
+        setProviderStatus({ connected: !!res?.connected, error: res?.error });
+        showToast(res?.error || "Gagal mengganti sumber kamera", "error");
+      }
+    } catch (e) {
+      showToast((e as Error).message, "error");
+    } finally {
+      setProviderBusy(false);
+      await refreshProviderStatus();
     }
   };
 
@@ -173,7 +250,16 @@ export default function SettingsPage() {
     fetchEnv();
     fetchHardware();
     fetchQueue();
+    fetchProvider();
     const interval = setInterval(fetchQueue, 5000);
+
+    const cam = getCameraBridge();
+    if (cam?.onProviderChanged) {
+      cam.onProviderChanged((status: CameraStatus) => {
+        if (status?.provider) setCameraProvider(status.provider);
+        setProviderStatus({ connected: !!status?.connected, error: status?.error });
+      });
+    }
 
     if (typeof window !== "undefined" && (window as any).electron) {
       const electron = (window as any).electron;
@@ -205,7 +291,7 @@ export default function SettingsPage() {
     }
 
     return () => clearInterval(interval);
-  }, [fetchEnv, fetchHardware]);
+  }, [fetchEnv, fetchHardware, fetchProvider]);
 
   useEffect(() => {
     const changed = Object.keys(envData).some(
@@ -519,6 +605,82 @@ export default function SettingsPage() {
                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM7 21h10M12 18v3"/></svg>
                 </div>
                 <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest">Hardware Mesin</h2>
+              </div>
+
+              {/* Camera Source (Provider Toggle) */}
+              <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-3">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-violet-50 text-violet-500 rounded-xl shrink-0 mt-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <label className="block text-[10px] font-bold text-slate-700">Sumber Kamera</label>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className={`inline-block h-2 w-2 rounded-full ${
+                          providerBusy ? "bg-amber-400 animate-pulse"
+                            : providerStatus?.connected ? "bg-emerald-500" : "bg-rose-500"
+                        }`} />
+                        <span className={`text-[9px] font-black uppercase tracking-widest ${
+                          providerBusy ? "text-amber-500"
+                            : providerStatus?.connected ? "text-emerald-600" : "text-rose-500"
+                        }`}>
+                          {providerBusy ? "Beralih" : providerStatus?.connected ? "Connected" : "Error"}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-[9px] text-slate-400 mb-2">Pilih jalur pengambilan gambar dari Canon EOS</p>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { id: "webcam" as CameraProvider, label: "Webcam Utility", sub: "Default" },
+                        { id: "digicamcontrol" as CameraProvider, label: "DigiCamControl", sub: "Web Server 5513" },
+                      ].map((opt) => (
+                        <button
+                          key={opt.id}
+                          onClick={() => handleSelectProvider(opt.id)}
+                          disabled={providerBusy}
+                          className={`px-3 py-2 rounded-xl border-2 text-left transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
+                            cameraProvider === opt.id
+                              ? "border-violet-500 bg-violet-50 shadow-sm"
+                              : "border-slate-200 bg-slate-50 hover:border-slate-300"
+                          }`}
+                        >
+                          <span className={`block text-[10px] font-black ${cameraProvider === opt.id ? "text-violet-700" : "text-slate-600"}`}>
+                            {opt.label}
+                          </span>
+                          <span className="block text-[9px] text-slate-400">{opt.sub}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {providerStatus?.detail && !providerStatus.error && (
+                      <p className="text-[9px] text-slate-400 mt-2 break-words">{providerStatus.detail}</p>
+                    )}
+
+                    {providerStatus?.error && (
+                      <div className="mt-2 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+                        <p className="text-[9px] text-rose-700 leading-relaxed break-words">{providerStatus.error}</p>
+                      </div>
+                    )}
+
+                    <div className="mt-2 bg-amber-50/80 border border-amber-200/50 rounded-lg px-3 py-2">
+                      <p className="text-[9px] text-amber-700/90 leading-relaxed">
+                        Pastikan hanya satu aplikasi (digiCamControl <strong>ATAU</strong> EOS Webcam Utility) yang berjalan
+                        di background saat memilih provider ini — keduanya tidak bisa memegang kamera USB yang sama.
+                        Kanvas Flipbook selalu memakai Webcam Utility.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={refreshProviderStatus}
+                      disabled={providerBusy}
+                      className="mt-2 w-full py-1.5 rounded-lg bg-slate-100 text-slate-600 font-bold text-[9px] uppercase tracking-widest hover:bg-slate-200 transition-colors disabled:opacity-50"
+                    >
+                      Tes Koneksi
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Camera Selection */}
