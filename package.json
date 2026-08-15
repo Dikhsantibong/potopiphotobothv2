@@ -8,7 +8,7 @@
     "type": "git",
     "url": "https://github.com/Dikhsantibong/potopiphotobothv2.git"
   },
-  "description": "RoamBooth Machine Application",
+  "description": "Potopi Photobooth Machine Application",
   "scripts": {
     "dev": "next dev",
     "dev:electron": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && electron .\"",
@@ -52,7 +52,8 @@
     "publish": [{
       "provider": "github",
       "owner": "Dikhsantibong",
-      "repo": "potopiphotobothv2"
+      "repo": "potopiphotobothv2",
+      "releaseType": "release"
     }],
     "compression": "store",
     "appId": "com.roambooth.machine1",

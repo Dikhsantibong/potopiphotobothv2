@@ -139,11 +139,39 @@ function setupCamera() {
   });
 }
 
-// Forward updater events to renderer
-function forwardUpdateEvent(win, eventName, data) {
+// Forward updater events to renderer.
+// Jendela dicari saat event terjadi (bukan disimpan sekali), supaya tetap
+// terkirim kalau window sempat dibuat ulang.
+function forwardUpdateEvent(eventName, data) {
+  const win = BrowserWindow.getAllWindows()[0];
   if (win && !win.isDestroyed()) {
     win.webContents.send(eventName, data);
   }
+}
+
+function setupAutoUpdater() {
+  autoUpdater.logger = console;
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
+
+  autoUpdater.on('checking-for-update', () => console.log('> Checking for update...'));
+  autoUpdater.on('update-available', (info) => {
+    console.log(`> Update available: ${info.version}`);
+    forwardUpdateEvent('update-available', info);
+  });
+  autoUpdater.on('update-not-available', (info) => {
+    console.log('> No update available.');
+    forwardUpdateEvent('update-not-available', info);
+  });
+  autoUpdater.on('error', (err) => {
+    console.error('> Updater error:', err);
+    forwardUpdateEvent('update-error', err == null ? 'unknown error' : (err.message || String(err)));
+  });
+  autoUpdater.on('download-progress', (progressObj) => forwardUpdateEvent('download-progress', progressObj));
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log(`> Update downloaded: ${info.version}`);
+    forwardUpdateEvent('update-downloaded', info);
+  });
 }
 
 app.whenReady().then(async () => {
@@ -180,17 +208,7 @@ app.whenReady().then(async () => {
       server.listen(port, () => {
         console.log(`> Next.js Server ready on http://${hostname}:${port}`);
         createWindow();
-        
-        // Auto updater configuration
-        autoUpdater.autoDownload = false;
-        autoUpdater.autoInstallOnAppQuit = false;
-
-        const win = BrowserWindow.getAllWindows()[0];
-        autoUpdater.on('update-available', (info) => forwardUpdateEvent(win, 'update-available', info));
-        autoUpdater.on('update-not-available', (info) => forwardUpdateEvent(win, 'update-not-available', info));
-        autoUpdater.on('error', (err) => forwardUpdateEvent(win, 'update-error', err.message));
-        autoUpdater.on('download-progress', (progressObj) => forwardUpdateEvent(win, 'download-progress', progressObj));
-        autoUpdater.on('update-downloaded', (info) => forwardUpdateEvent(win, 'update-downloaded', info));
+        setupAutoUpdater();
       });
     } catch (err) {
       console.error('Next.js prepare failed:', err);

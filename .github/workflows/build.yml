@@ -2,34 +2,76 @@ name: Build and Release Electron App
 
 on:
   push:
-    tags:
-      - 'v*' # Trigger workflow on version tags, e.g., v1.0.0, v1.0.1
+    branches:
+      - main
+  workflow_dispatch: # bisa dijalankan manual dari tab Actions
+
+permissions:
+  contents: write # wajib: electron-builder butuh izin membuat Release
 
 jobs:
   release:
     runs-on: windows-latest
-    
+
     steps:
       - name: Check out Git repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Baca versi dari package.json
+        id: ver
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Versi terbaca: $VERSION"
+
+      - name: Cek apakah release untuk versi ini sudah ada
+        id: check
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "${{ steps.ver.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release ${{ steps.ver.outputs.tag }} sudah ada -> build dilewati."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Release ${{ steps.ver.outputs.tag }} belum ada -> lanjut build."
+          fi
 
       - name: Install Node.js
-        uses: actions/setup-node@v3
+        if: steps.check.outputs.exists == 'false'
+        uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
+          cache: 'npm'
 
       - name: Install Dependencies
-        run: npm install
+        if: steps.check.outputs.exists == 'false'
+        run: npm ci
+
+      - name: Siapkan .env bawaan (opsional, dari secret APP_ENV)
+        if: steps.check.outputs.exists == 'false'
+        shell: bash
+        env:
+          APP_ENV: ${{ secrets.APP_ENV }}
+        run: |
+          if [ -z "$APP_ENV" ]; then
+            echo "Secret APP_ENV kosong -> installer dibuat tanpa .env bawaan."
+          else
+            printf '%s\n' "$APP_ENV" > .env
+            echo ".env bawaan dibuat."
+          fi
 
       - name: Build Next.js
+        if: steps.check.outputs.exists == 'false'
         run: npm run build
 
-      - name: Build and Publish Electron App
-        uses: samuelmeuli/action-electron-builder@v1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          release: true
-          build_script_name: false
+      - name: Build & Publish Installer ke GitHub Releases
+        if: steps.check.outputs.exists == 'false'
+        run: npx electron-builder --win --publish always
         env:
-          # This token is automatically provided by GitHub Actions
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
