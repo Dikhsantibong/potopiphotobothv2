@@ -1,6 +1,6 @@
 {
   "name": "potopi-photobooth",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "main": "main.js",
   "author": "CtechAgency",
@@ -22,7 +22,7 @@
     "version:sync": "node scripts/sync-lock-version.mjs",
     "release": "npm version patch --no-git-tag-version && npm run version:sync"
   },
-  "dependencies": {
+  "dependencies": { 
     "@ffmpeg/core": "^0.12.6",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",

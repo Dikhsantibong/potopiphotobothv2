@@ -643,6 +643,44 @@ function CameraContent() {
 
 
 
+  // Pengambilan file berjalan di belakang layar. Frame yang masih menunggu
+
+  // JPEG resolusi penuh dicatat di sini supaya tombol LANJUT bisa menunggunya.
+
+  const pendingCapturesRef = useRef<Map<number, Promise<void>>>(new Map());
+
+  const [refiningFrames, setRefiningFrames] = useState<number[]>([]);
+
+  const [waitingForPhotos, setWaitingForPhotos] = useState(false);
+
+
+
+  // Dinaikkan setiap kali sesi frame berubah (capture baru / ULANGI), supaya
+
+  // hasil unduhan yang terlambat tidak menimpa frame yang sudah tidak relevan.
+
+  const captureGenRef = useRef(0);
+
+
+
+  const photosRef = useRef(photos);
+
+  useEffect(() => { photosRef.current = photos; }, [photos]);
+
+
+
+  // Rekaman Live Photo diselesaikan lewat MediaRecorder.onstop yang asinkron,
+
+  // jadi state-nya bisa berubah setelah handleNext menunggu. Ref ini memastikan
+
+  // frame terakhir ikut tersimpan.
+
+  const videosRef = useRef(videos);
+
+  useEffect(() => { videosRef.current = videos; }, [videos]);
+
+
+
   useEffect(() => {
 
     if (!captureError) return;
@@ -879,6 +917,48 @@ function CameraContent() {
 
 
 
+  /**
+
+   * Salin frame live view terakhir sebelum shutter. Dipakai sebagai preview
+
+   * sementara supaya user langsung melihat hasilnya, tanpa menunggu transfer
+
+   * file dari kamera.
+
+   */
+
+  const snapshotLiveView = (): string | null => {
+
+    const img = liveImgRef.current;
+
+    if (!img || !img.naturalWidth) return null;
+
+    const canvas = document.createElement("canvas");
+
+    canvas.width = img.naturalWidth;
+
+    canvas.height = img.naturalHeight;
+
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx) return null;
+
+    if (isMirrored) {
+
+      ctx.translate(canvas.width, 0);
+
+      ctx.scale(-1, 1);
+
+    }
+
+    ctx.drawImage(img, 0, 0);
+
+    return canvas.toDataURL("image/jpeg", 0.9);
+
+  };
+
+
+
   const captureFromProvider = async () => {
 
     setCaptureError(null);
@@ -886,6 +966,12 @@ function CameraContent() {
     // Hentikan rekaman tepat saat shutter, sama seperti jalur webcam.
 
     stopDccRecording();
+
+
+
+    const frameIndex = currentFrameRef.current;
+
+    const generation = ++captureGenRef.current;
 
 
 
@@ -917,37 +1003,19 @@ function CameraContent() {
 
 
 
-    // 3. Baru ambil filenya. Durasi langkah ini tidak lagi menggeser momen foto.
+    // 3. Preview instan dari frame live view. Ini yang menghilangkan layar
 
-    const res = await collectPhoto();
+    //    loading: user langsung masuk ke tampilan ULANGI/LANJUT.
 
-    if (!res?.ok || !res.dataUrl) {
+    const provisional = snapshotLiveView();
 
-      setCaptureError(res?.error || "Kamera tidak merespon, coba lagi");
-
-      return;
-
-    }
-
-
-
-    try {
-
-      // Tanpa mirror, JPEG kamera dipakai apa adanya — resolusi, warna, dan
-
-      // metadata EXIF (merek kamera, ISO, shutter, lensa) tetap utuh karena
-
-      // tidak pernah melewati canvas. Crop 1.08 juga tidak diterapkan: itu
-
-      // khusus menghilangkan black bar EOS Webcam Utility.
-
-      const processed = isMirrored ? await processProviderJpeg(res.dataUrl) : res.dataUrl;
+    if (provisional) {
 
       setPhotos((prev) => {
 
         const u = [...prev];
 
-        u[currentFrame] = processed;
+        u[frameIndex] = provisional;
 
         return u;
 
@@ -955,11 +1023,91 @@ function CameraContent() {
 
       setShowPreview(true);
 
-    } catch (e) {
-
-      setCaptureError((e as Error).message);
-
     }
+
+
+
+    // 4. JPEG resolusi penuh diambil di belakang layar lalu menggantikan
+
+    //    preview sementara. UI tidak menunggu langkah ini.
+
+    const task = (async () => {
+
+      const res = await collectPhoto();
+
+
+
+      // Frame ini sudah di-retake atau diganti capture lain — abaikan hasilnya.
+
+      if (captureGenRef.current !== generation) return;
+
+
+
+      if (!res?.ok || !res.dataUrl) {
+
+        setCaptureError(
+
+          provisional
+
+            ? "Foto resolusi penuh gagal diambil dari kamera — sementara memakai frame live view"
+
+            : (res?.error || "Kamera tidak merespon, coba lagi")
+
+        );
+
+        return;
+
+      }
+
+
+
+      try {
+
+        // Tanpa mirror, JPEG kamera dipakai apa adanya — resolusi, warna, dan
+
+        // metadata EXIF (merek kamera, ISO, shutter, lensa) tetap utuh karena
+
+        // tidak pernah melewati canvas. Crop 1.08 juga tidak diterapkan: itu
+
+        // khusus menghilangkan black bar EOS Webcam Utility.
+
+        const processed = isMirrored ? await processProviderJpeg(res.dataUrl) : res.dataUrl;
+
+        if (captureGenRef.current !== generation) return;
+
+        setPhotos((prev) => {
+
+          const u = [...prev];
+
+          u[frameIndex] = processed;
+
+          return u;
+
+        });
+
+        if (!provisional) setShowPreview(true);
+
+      } catch (e) {
+
+        setCaptureError((e as Error).message);
+
+      }
+
+    })();
+
+
+
+    pendingCapturesRef.current.set(frameIndex, task);
+
+    setRefiningFrames((prev) => (prev.includes(frameIndex) ? prev : [...prev, frameIndex]));
+
+    void task.finally(() => {
+
+      pendingCapturesRef.current.delete(frameIndex);
+
+      setRefiningFrames((prev) => prev.filter((i) => i !== frameIndex));
+
+    });
 
   };
 
@@ -978,6 +1126,30 @@ function CameraContent() {
   const handleNext = async () => {
 
     setShowPreview(false);
+
+
+
+    // Preview boleh memakai frame live view sementara, tetapi yang disimpan dan
+
+    // dicetak harus JPEG resolusi penuh dari kamera. Biasanya sudah selesai
+
+    // sebelum user sempat menekan tombol ini.
+
+    if (pendingCapturesRef.current.size > 0) {
+
+      setWaitingForPhotos(true);
+
+      await Promise.allSettled([...pendingCapturesRef.current.values()]);
+
+      setWaitingForPhotos(false);
+
+    }
+
+
+
+    // Diambil setelah await supaya tidak memakai state yang sudah usang.
+
+    const photos = photosRef.current;
 
     const allDone = photos.every((p) => p !== null);
 
@@ -1029,7 +1201,7 @@ function CameraContent() {
 
       localStorage.setItem("capturedPhotos", JSON.stringify(finalPhotos));
 
-      await localforage.setItem("liveVideos", videos);
+      await localforage.setItem("liveVideos", videosRef.current);
 
       router.push(`/render?kanvas=${canvasType}&template=${templateId}&time=${timeLeft}`);
 
@@ -1048,6 +1220,18 @@ function CameraContent() {
 
 
   const handleRetake = () => {
+
+    // Tandai unduhan yang masih berjalan sebagai usang agar tidak mengisi ulang
+
+    // frame yang baru saja dikosongkan.
+
+    captureGenRef.current++;
+
+    pendingCapturesRef.current.delete(currentFrame);
+
+    setRefiningFrames((prev) => prev.filter((i) => i !== currentFrame));
+
+    setCaptureError(null);
 
     setPhotos((prev) => { const u = [...prev]; u[currentFrame] = null; return u; });
 
@@ -1148,6 +1332,24 @@ function CameraContent() {
     return `${cleanBaseUrl}/storage/${cleanPath}`;
 
   };
+
+
+
+  // Zoom 1.08 adalah kompensasi khusus EOS Webcam Utility, yang memberi frame
+
+  // dengan black bar di sisi kiri-kanan. digiCamControl mengirim frame penuh
+
+  // dari sensor, jadi tidak ada zoom maupun crop sama sekali di sana.
+
+  const previewZoom = usesWebcam ? 1.08 : 1;
+
+
+
+  // Panel besar memakai 'contain' pada digiCamControl supaya yang terlihat
+
+  // persis sama dengan yang tersimpan — tidak ada bagian yang terpotong diam-diam.
+
+  const previewFit: "cover" | "contain" = usesWebcam ? "cover" : "contain";
 
 
 
@@ -1265,9 +1467,9 @@ function CameraContent() {
 
                   style={{
 
-                    objectFit: 'cover',
+                    objectFit: previewFit,
 
-                    transform: `scaleX(${isMirrored ? -1 : 1}) scale(1.08)`,
+                    transform: `scaleX(${isMirrored ? -1 : 1}) scale(${previewZoom})`,
 
                     filter: !showPreview ? getFilterStyle() : ""
 
@@ -1299,9 +1501,9 @@ function CameraContent() {
 
                   src={photos[currentFrame]!}
 
-                  className="absolute inset-0 w-full h-full object-cover z-10"
+                  className="absolute inset-0 w-full h-full z-10"
 
-                  style={{ filter: getFilterStyle(frameEdits[currentFrame]) }}
+                  style={{ objectFit: previewFit, filter: getFilterStyle(frameEdits[currentFrame]) }}
 
                   alt="Preview"
 
@@ -1328,11 +1530,20 @@ function CameraContent() {
               {/* Flash Overlay */}
               {flashActive && <div className="absolute inset-0 bg-white z-50 animate-out fade-out duration-300"></div>}
 
-              {/* Menunggu kamera DSLR menulis file (hanya provider digiCamControl) */}
-              {isCapturing && (
-                <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-black/40 backdrop-blur-sm">
+              {/* Foto resolusi penuh masih ditransfer dari kamera. Preview sudah
+                  tampil, jadi indikatornya kecil saja dan tidak menutupi layar. */}
+              {refiningFrames.length > 0 && (
+                <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 bg-slate-900/70 backdrop-blur-sm px-3 py-1.5 rounded-full">
+                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-white font-black text-[9px] uppercase tracking-widest">Menyimpan foto kamera</span>
+                </div>
+              )}
+
+              {/* Hanya muncul kalau user menekan LANJUT sebelum transfer selesai */}
+              {waitingForPhotos && (
+                <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-black/40 backdrop-blur-sm">
                   <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span className="text-white font-black text-[11px] uppercase tracking-widest">Mengambil foto...</span>
+                  <span className="text-white font-black text-[11px] uppercase tracking-widest">Menyimpan foto kamera...</span>
                 </div>
               )}
 
@@ -1416,7 +1627,9 @@ function CameraContent() {
 
                     onClick={handleRetake}
 
-                    className="flex-1 h-11 rounded-xl bg-[#f15a09] text-white font-black text-sm tracking-widest shadow-lg hover:brightness-110 active:scale-95 transition-all uppercase border-2 border-white/30"
+                    disabled={waitingForPhotos}
+
+                    className="flex-1 h-11 rounded-xl bg-[#f15a09] text-white font-black text-sm tracking-widest shadow-lg hover:brightness-110 active:scale-95 transition-all uppercase border-2 border-white/30 disabled:opacity-60"
 
                   >
 
@@ -1428,11 +1641,13 @@ function CameraContent() {
 
                     onClick={handleNext}
 
-                    className="flex-1 h-11 rounded-xl bg-[#f15a09] text-white font-black text-sm tracking-widest shadow-lg hover:brightness-110 active:scale-95 transition-all uppercase border-2 border-white/30"
+                    disabled={waitingForPhotos}
+
+                    className="flex-1 h-11 rounded-xl bg-[#f15a09] text-white font-black text-sm tracking-widest shadow-lg hover:brightness-110 active:scale-95 transition-all uppercase border-2 border-white/30 disabled:opacity-60"
 
                   >
 
-                    {photos.every((p) => p !== null) ? "SELESAI" : "LANJUT"}
+                    {waitingForPhotos ? "MENYIMPAN..." : photos.every((p) => p !== null) ? "SELESAI" : "LANJUT"}
 
                   </button>
 
@@ -1560,7 +1775,13 @@ function CameraContent() {
 
                           className="absolute inset-0 w-full h-full"
 
-                          style={{ objectFit: 'cover', transform: `scaleX(${isMirrored ? -1 : 1}) scale(1.08)`, filter: getFilterStyle() }}
+                          // Kotak template tetap 'cover': hasil akhir memang di-crop
+
+                          // ke rasio frame oleh /render, jadi ini meniru hasil sebenarnya.
+
+                          // Yang dihilangkan hanya zoom 1.08 milik webcam.
+
+                          style={{ objectFit: 'cover', transform: `scaleX(${isMirrored ? -1 : 1}) scale(${previewZoom})`, filter: getFilterStyle() }}
 
                         />
 
