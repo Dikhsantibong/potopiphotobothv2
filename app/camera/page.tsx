@@ -1129,13 +1129,19 @@ function CameraContent() {
 
 
 
-    // Preview boleh memakai frame live view sementara, tetapi yang disimpan dan
+    // Cek apakah ini frame terakhir menggunakan foto yang sudah berisi preview sementara
 
-    // dicetak harus JPEG resolusi penuh dari kamera. Biasanya sudah selesai
+    const currentPhotos = photosRef.current;
 
-    // sebelum user sempat menekan tombol ini.
+    const allDone = currentPhotos.every((p) => p !== null);
 
-    if (pendingCapturesRef.current.size > 0) {
+
+
+    // JANGAN MENUNGGU transfer selesai jika bukan frame terakhir.
+
+    // Biarkan transfer berjalan paralel di belakang layar sementara user melihat countdown foto berikutnya!
+
+    if (allDone && pendingCapturesRef.current.size > 0) {
 
       setWaitingForPhotos(true);
 
@@ -1151,9 +1157,11 @@ function CameraContent() {
 
     const photos = photosRef.current;
 
-    const allDone = photos.every((p) => p !== null);
+    const isActuallyAllDone = photos.every((p) => p !== null);
 
-    if (allDone) {
+
+
+    if (isActuallyAllDone) {
 
       stopCamera();
 
@@ -1345,11 +1353,11 @@ function CameraContent() {
 
 
 
-  // Panel besar memakai 'contain' pada digiCamControl supaya yang terlihat
+  // Panel besar memakai 'cover' supaya preview penuh tanpa ada
 
-  // persis sama dengan yang tersimpan — tidak ada bagian yang terpotong diam-diam.
+  // panel hitam putih (black/white bars) di atas dan bawah layar.
 
-  const previewFit: "cover" | "contain" = usesWebcam ? "cover" : "contain";
+  const previewFit: "cover" | "contain" = "cover";
 
 
 

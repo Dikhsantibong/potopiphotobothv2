@@ -253,13 +253,13 @@ function PrintContent() {
       const raw = localStorage.getItem("capturedPhotos") || localStorage.getItem("rawPhotos");
       if (raw) {
         const parsedPhotos: string[] = JSON.parse(raw);
-        setRawPhotos(parsedPhotos);
+        const validPhotos = parsedPhotos.filter(Boolean);
+        setRawPhotos(validPhotos);
 
         // Bangun GIF sekali di awal. Promise-nya disimpan supaya proses upload
         // bisa menunggunya tanpa memblokir render halaman.
-        const framesForGif = parsedPhotos.filter(Boolean);
-        if (framesForGif.length > 0) {
-          gifPromiseRef.current = buildGif(framesForGif);
+        if (validPhotos.length > 0) {
+          gifPromiseRef.current = buildGif(validPhotos);
         }
       }
 
