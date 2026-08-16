@@ -90,6 +90,67 @@ function toDisplayJpeg(buffer) {
 }
 
 /**
+ * Menjaga jendela photobooth tetap di depan.
+ *
+ * digiCamControl adalah aplikasi desktop biasa: `CMD=LiveViewWnd_Show` membuka
+ * jendela Live View miliknya dan `CMD=Capture` memunculkan jendela preview foto.
+ * Keduanya muncul di atas aplikasi photobooth yang berjalan fullscreen.
+ *
+ * Windows membatasi SetForegroundWindow, jadi `focus()` saja tidak cukup
+ * andal — yang benar-benar menjamin urutan tumpukan adalah setAlwaysOnTop,
+ * dipasang selama sesi kamera berlangsung lalu dilepas setelahnya.
+ */
+function createWindowGuard(getWindow) {
+  let timers = [];
+  let pinned = false;
+
+  const clearTimers = () => {
+    timers.forEach(clearTimeout);
+    timers = [];
+  };
+
+  const bringToFront = () => {
+    const win = getWindow();
+    if (!win || win.isDestroyed()) return;
+    try {
+      if (win.isMinimized()) win.restore();
+      win.moveTop();
+      win.focus();
+    } catch (err) {
+      console.warn('[Camera] Gagal mengangkat jendela aplikasi:', err.message);
+    }
+  };
+
+  return {
+    /** Dipanggil setelah perintah digiCamControl yang memunculkan jendela. */
+    reclaim() {
+      clearTimers();
+      bringToFront();
+      // Jendela digiCamControl kadang baru muncul beberapa ratus milidetik
+      // setelah perintahnya dijawab, jadi rebut posisi depan beberapa kali.
+      [150, 450, 1000].forEach((ms) => timers.push(setTimeout(bringToFront, ms)));
+    },
+
+    /** Kunci di atas selama sesi kamera; dilepas saat sesi selesai. */
+    setPinned(value) {
+      const win = getWindow();
+      pinned = !!value;
+      if (!win || win.isDestroyed()) return;
+      try {
+        win.setAlwaysOnTop(pinned, 'screen-saver');
+      } catch (err) {
+        console.warn('[Camera] Gagal mengunci jendela di depan:', err.message);
+      }
+      if (pinned) bringToFront();
+      else clearTimers();
+    },
+
+    isPinned: () => pinned,
+    dispose: clearTimers,
+  };
+}
+
+/**
  * Jembatan request/response Main → Renderer, dipakai WebcamProviderService
  * untuk menyuruh renderer menghentikan MediaStream-nya.
  */
@@ -130,10 +191,12 @@ function createRendererBridge(ipcMain, getWindow) {
  */
 function registerCameraIpc({ ipcMain, getWindow, sessionRoot }) {
   const bridge = createRendererBridge(ipcMain, getWindow);
+  const windowGuard = createWindowGuard(getWindow);
 
   const manager = new CameraProviderManager({
     bridge,
     sessionRoot,
+    windowGuard,
     emit: (channel, payload) => {
       const win = getWindow();
       if (win && !win.isDestroyed()) win.webContents.send(channel, payload);

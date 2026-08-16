@@ -39,6 +39,9 @@ class DigiCamControlService extends ICameraProvider {
     this.imageQuality = options.imageQuality || '';
     // 'CaptureNoAf' = shutter jatuh seketika; 'Capture' = autofokus dulu (ada jeda).
     this.shutterCommand = options.shutterCommand === 'Capture' ? 'Capture' : 'CaptureNoAf';
+    // Dipanggil setelah perintah yang memunculkan jendela GUI digiCamControl,
+    // agar jendela photobooth bisa direbut kembali ke depan.
+    this.onWindowRaised = typeof options.onWindowRaised === 'function' ? options.onWindowRaised : null;
     this.liveViewActive = false;
     /** Nama file terakhir sebelum shutter — diambil saat arm, bukan saat jepret. */
     this.armedBaseline = null;
@@ -75,6 +78,23 @@ class DigiCamControlService extends ICameraProvider {
 
   _cmd(cmd, opts) {
     return this._fetch(`/?CMD=${encodeURIComponent(cmd)}`, opts);
+  }
+
+  /**
+   * Perintah yang membuka jendela digiCamControl (Live View, preview capture).
+   * Setelah dijalankan, jendela photobooth diangkat kembali ke depan.
+   */
+  async _cmdRaisingWindow(cmd, opts) {
+    try {
+      return await this._cmd(cmd, opts);
+    } finally {
+      // Dipanggil juga saat perintah gagal: jendela bisa terlanjur muncul.
+      try {
+        this.onWindowRaised?.();
+      } catch {
+        /* jangan sampai mengganggu alur capture */
+      }
+    }
   }
 
   _abortPending() {
@@ -197,7 +217,7 @@ class DigiCamControlService extends ICameraProvider {
     if (this.imageQuality) await this.setImageQuality(this.imageQuality);
 
     try {
-      await this._cmd('LiveViewWnd_Show', { timeout: 5000 });
+      await this._cmdRaisingWindow('LiveViewWnd_Show', { timeout: 5000 });
     } catch (err) {
       return {
         ok: false,
@@ -362,7 +382,7 @@ class DigiCamControlService extends ICameraProvider {
     }
 
     try {
-      await this._cmd(this.shutterCommand, { timeout: 8000 });
+      await this._cmdRaisingWindow(this.shutterCommand, { timeout: 8000 });
       this.armed = false;
       return { ok: true, command: this.shutterCommand, elapsed: Date.now() - startedAt };
     } catch (err) {
@@ -434,7 +454,7 @@ class DigiCamControlService extends ICameraProvider {
 
     // Kamera menutup live view saat shutter jalan. Nyalakan lagi tanpa menunggu
     // supaya frame berikutnya sudah siap begitu user menekan ULANGI/LANJUT.
-    this._cmd('LiveViewWnd_Show', { timeout: 4000 }).catch(() => { });
+    this._cmdRaisingWindow('LiveViewWnd_Show', { timeout: 4000 }).catch(() => { });
 
     // Buffer dikembalikan mentah; lapisan IPC yang mengecilkannya sebelum
     // dikirim ke renderer. File di folder sesi tetap resolusi penuh.

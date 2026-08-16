@@ -83,9 +83,22 @@ function makeBridge() {
   console.log('\n[B] Init manager');
   const bridge = makeBridge();
   const events = [];
+
+  // Pengganti jendela Electron: mencatat kapan aplikasi dikunci di depan dan
+  // kapan posisinya direbut kembali dari jendela digiCamControl.
+  const guard = {
+    pinned: null,
+    reclaims: 0,
+    disposed: false,
+    setPinned(v) { this.pinned = v; },
+    reclaim() { this.reclaims++; },
+    dispose() { this.disposed = true; },
+  };
+
   const manager = new CameraProviderManager({
     bridge,
     sessionRoot: path.join(workDir, 'sessions'),
+    windowGuard: guard,
     emit: (channel, payload) => events.push({ channel, payload }),
   });
   await manager.init();
@@ -154,7 +167,37 @@ function makeBridge() {
   const unchanged = await manager.setProvider('webcam');
   check('pilih provider yang sama = no-op', unchanged.ok === true && unchanged.unchanged === true);
 
+  // ── Jendela digiCamControl tidak boleh menutupi photobooth ──
+  console.log('\n[C] Jendela aplikasi tetap di depan saat sesi digiCamControl');
+
+  guard.pinned = null;
+  await manager.setSessionActive(true);
+  check('provider webcam tidak mengunci jendela', guard.pinned === false, `pinned=${guard.pinned}`);
+  await manager.setSessionActive(false);
+
+  await manager.setProvider('digicamcontrol');
+  guard.pinned = null;
+  guard.reclaims = 0;
+
+  await manager.setSessionActive(true);
+  check('sesi digiCamControl mengunci jendela di depan', guard.pinned === true, `pinned=${guard.pinned}`);
+
+  // Perintah yang membuka jendela Live View harus merebut posisi depan.
+  const dcc = manager.provider;
+  await dcc._cmdRaisingWindow('LiveViewWnd_Show', { timeout: 500 }).catch(() => { });
+  check('posisi depan direbut setelah LiveViewWnd_Show', guard.reclaims >= 1, `reclaim=${guard.reclaims}`);
+
+  // Server mati pada test ini, jadi perintah gagal — reclaim tetap harus jalan.
+  const before = guard.reclaims;
+  await dcc._cmdRaisingWindow('CaptureNoAf', { timeout: 500 }).catch(() => { });
+  check('posisi depan direbut walau perintah gagal', guard.reclaims > before, `reclaim=${guard.reclaims}`);
+
+  await manager.setSessionActive(false);
+  check('kunci dilepas setelah sesi selesai', guard.pinned === false, `pinned=${guard.pinned}`);
+
+  await manager.setProvider('webcam');
   await manager.shutdown();
+  check('kunci dilepas dan guard dibersihkan saat shutdown', guard.pinned === false && guard.disposed === true);
 
   console.log(`\nHasil: ${passed} lulus, ${failed} gagal`);
   process.exit(failed > 0 ? 1 : 0);

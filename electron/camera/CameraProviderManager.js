@@ -26,6 +26,8 @@ class CameraProviderManager {
     this.bridge = options.bridge || null;
     this.sessionRoot = options.sessionRoot;
     this.emit = options.emit || (() => {});
+    // Menjaga jendela photobooth tetap di atas jendela digiCamControl.
+    this.windowGuard = options.windowGuard || null;
 
     /** @type {import('./ICameraProvider').ICameraProvider|null} */
     this.provider = null;
@@ -42,6 +44,8 @@ class CameraProviderManager {
         sessionDir: this.currentSessionDir || this.sessionRoot,
         imageQuality: config.readDigiCamQuality(),
         shutterCommand: config.readDigiCamShutter(),
+        // Dipanggil tepat setelah perintah yang memunculkan jendela digiCamControl.
+        onWindowRaised: () => this.windowGuard?.reclaim(),
       });
     }
     return new WebcamProviderService({ bridge: this.bridge });
@@ -221,12 +225,21 @@ class CameraProviderManager {
 
     if (!this.sessionActive) {
       this.currentSessionDir = null;
+      // Lepas kunci supaya di luar sesi (Settings, dialog sistem) aplikasi
+      // berperilaku normal.
+      this.windowGuard?.setPinned(false);
       return { ok: true, sessionActive: false };
     }
 
     if (this.activeName !== 'digicamcontrol' || !this.provider) {
+      // Provider webcam tidak memunculkan jendela pihak ketiga.
+      this.windowGuard?.setPinned(false);
       return { ok: true, sessionActive: true };
     }
+
+    // Selama sesi digiCamControl, jendela photobooth dikunci di atas jendela
+    // Live View dan preview foto milik digiCamControl.
+    this.windowGuard?.setPinned(true);
 
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const dir = path.join(this.sessionRoot, stamp);
@@ -369,6 +382,8 @@ class CameraProviderManager {
   }
 
   async shutdown() {
+    this.windowGuard?.setPinned(false);
+    this.windowGuard?.dispose?.();
     await this._disposeCurrent();
   }
 }
