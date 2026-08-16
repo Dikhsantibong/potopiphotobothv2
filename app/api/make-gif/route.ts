@@ -72,15 +72,16 @@ export async function POST(req: Request) {
     const outputPath = path.join(workDir, "out.gif")
     const framerate = (1000 / delayMs).toFixed(4)
 
-    // palettegen/paletteuse dalam satu pass: GIF 256 warna dengan dithering halus.
-    const args = [
-      "-y",
-      "-framerate", framerate,
-      "-i", path.join(workDir, "frame_%03d.jpg"),
-      "-vf", `scale=${width}:-2:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=256[p];[s1][p]paletteuse=dither=sierra2_4a`,
-      "-loop", "0",
-      outputPath
-    ]
+      // stats_mode=single & new=1 menghasilkan palet 256 warna KHUSUS untuk setiap frame secara terpisah.
+      // dither=none menghilangkan efek titik-titik (retro noise/sandy effect) sama sekali.
+      const args = [
+        "-y",
+        "-framerate", framerate,
+        "-i", path.join(workDir, "frame_%03d.jpg"),
+        "-vf", `scale=${width}:-2:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=single[p];[s1][p]paletteuse=new=1:dither=none`,
+        "-loop", "0",
+        outputPath
+      ]
 
     console.log(`[make-gif] ${frames.length} frame, delay ${delayMs}ms, lebar ${width}px`)
     await execFileAsync(absoluteFfmpegPath, args, { timeout: 60000, maxBuffer: 10 * 1024 * 1024 })

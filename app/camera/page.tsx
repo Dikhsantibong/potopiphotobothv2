@@ -811,7 +811,19 @@ function CameraContent() {
 
         }
 
-        ctx.drawImage(el, 0, 0, canvas.width, canvas.height);
+        const w = el.naturalWidth;
+
+        const h = el.naturalHeight;
+
+        const sw = w / previewZoom;
+
+        const sh = h / previewZoom;
+
+        const sx = (w - sw) / 2;
+
+        const sy = (h - sh) / 2;
+
+        ctx.drawImage(el, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
 
         ctx.restore();
 
@@ -943,15 +955,33 @@ function CameraContent() {
 
     if (!ctx) return null;
 
+
+
+    const w = canvas.width;
+
+    const h = canvas.height;
+
+    const sw = w / previewZoom;
+
+    const sh = h / previewZoom;
+
+    const sx = (w - sw) / 2;
+
+    const sy = (h - sh) / 2;
+
+
+
     if (isMirrored) {
 
-      ctx.translate(canvas.width, 0);
+      ctx.translate(w, 0);
 
       ctx.scale(-1, 1);
 
     }
 
-    ctx.drawImage(img, 0, 0);
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+
+
 
     return canvas.toDataURL("image/jpeg", 0.9);
 
@@ -1045,15 +1075,11 @@ function CameraContent() {
 
       if (!res?.ok || !res.dataUrl) {
 
-        setCaptureError(
+        if (!provisional) {
 
-          provisional
+          setCaptureError(res?.error || "Kamera tidak merespon, coba lagi");
 
-            ? "Foto resolusi penuh gagal diambil dari kamera — sementara memakai frame live view"
-
-            : (res?.error || "Kamera tidak merespon, coba lagi")
-
-        );
+        }
 
         return;
 
@@ -1099,13 +1125,9 @@ function CameraContent() {
 
     pendingCapturesRef.current.set(frameIndex, task);
 
-    setRefiningFrames((prev) => (prev.includes(frameIndex) ? prev : [...prev, frameIndex]));
-
     void task.finally(() => {
 
       pendingCapturesRef.current.delete(frameIndex);
-
-      setRefiningFrames((prev) => prev.filter((i) => i !== frameIndex));
 
     });
 
@@ -1355,13 +1377,13 @@ function CameraContent() {
 
 
 
-  // Zoom 1.08 adalah kompensasi khusus EOS Webcam Utility, yang memberi frame
+  // digiCamControl atau DSLR lain sering memiliki black bar di Live View (USB PTP).
 
-  // dengan black bar di sisi kiri-kanan. digiCamControl mengirim frame penuh
+  // Zoom 1.08 (8%) memastikan framing Live View persis sama dengan hasil foto akhir 
 
-  // dari sensor, jadi tidak ada zoom maupun crop sama sekali di sana.
+  // yang ditarik dari sensor secara penuh, menghindari kesan foto hasil akhir "ter-zoom in".
 
-  const previewZoom = usesWebcam ? 1.08 : 1;
+  const previewZoom = 1.08;
 
 
 
@@ -1550,20 +1572,13 @@ function CameraContent() {
               {/* Flash Overlay */}
               {flashActive && <div className="absolute inset-0 bg-white z-50 animate-out fade-out duration-300"></div>}
 
-              {/* Foto resolusi penuh masih ditransfer dari kamera. Preview sudah
-                  tampil, jadi indikatornya kecil saja dan tidak menutupi layar. */}
-              {refiningFrames.length > 0 && (
-                <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 bg-slate-900/70 backdrop-blur-sm px-3 py-1.5 rounded-full">
-                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span className="text-white font-black text-[9px] uppercase tracking-widest">Menyimpan foto kamera</span>
-                </div>
-              )}
+              {/* Indikator refiningFrames dihapus agar proses berjalan senyap (invisible) bagi customer */}
 
               {/* Hanya muncul kalau user menekan LANJUT sebelum transfer selesai */}
               {waitingForPhotos && (
                 <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-black/40 backdrop-blur-sm">
                   <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span className="text-white font-black text-[11px] uppercase tracking-widest">Menyimpan foto kamera...</span>
+                  <span className="text-white font-black text-[11px] uppercase tracking-widest">MEMPROSES HASIL...</span>
                 </div>
               )}
 
