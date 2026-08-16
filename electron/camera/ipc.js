@@ -112,6 +112,8 @@ function registerCameraIpc({ ipcMain, getWindow, sessionRoot }) {
   ipcMain.handle('camera:getProvider', () => manager.getProvider());
   ipcMain.handle('camera:setProvider', (_e, name) => manager.setProvider(name));
   ipcMain.handle('camera:setSessionActive', (_e, active) => manager.setSessionActive(active));
+  ipcMain.handle('camera:getImageQuality', () => manager.getImageQuality());
+  ipcMain.handle('camera:setImageQuality', (_e, value) => manager.setImageQuality(value));
 
   // Frame live view dikirim sebagai Buffer mentah (bukan base64) agar hemat CPU
   // dan bandwidth IPC saat polling 10–15 fps.

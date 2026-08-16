@@ -55,6 +55,8 @@ interface CameraBridge {
   setProvider: (name: CameraProvider) => Promise<CameraStatus & { ok: boolean; code?: string; rolledBackTo?: CameraProvider }>;
   onProviderChanged: (cb: (status: CameraStatus) => void) => void;
   setSessionActive: (active: boolean) => Promise<unknown>;
+  getImageQuality: () => Promise<string>;
+  setImageQuality: (value: string) => Promise<{ ok: boolean; value: string; appliedNow?: boolean }>;
   onWebcamRequest: (cb: (payload: { id: string; action: string; data?: unknown }) => void) => void;
   respondWebcam: (payload: { id: string; ok: boolean; data?: unknown; error?: string }) => void;
 }

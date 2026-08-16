@@ -221,6 +221,11 @@ export default function BackgroundUploader() {
       formData.append("video", videoToUpload, "final.mp4");
     }
 
+    // GIF (antrean lama tidak punya field ini — dilewati begitu saja)
+    if (task.gifBlob instanceof Blob) {
+      formData.append("gif", task.gifBlob, "final.gif");
+    }
+
     return new Promise<"success" | "network_error" | "server_error">((resolve) => {
       const xhr = new XMLHttpRequest();
       xhr.open("POST", "/api/final-images");

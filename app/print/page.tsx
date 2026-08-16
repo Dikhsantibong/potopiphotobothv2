@@ -195,11 +195,47 @@ function PrintContent() {
   const [pendingPrintQty, setPendingPrintQty] = useState(1);
   const [pendingPrintAmount, setPendingPrintAmount] = useState(0);
 
+  // GIF animasi dari foto-foto frame — dipakai untuk preview dan ikut diunggah.
+  const [gifUrl, setGifUrl] = useState<string | null>(null);
+  const [gifState, setGifState] = useState<"idle" | "building" | "ready" | "error">("idle");
+  const gifPromiseRef = useRef<Promise<Blob | null> | null>(null);
+
   const uploadStarted = useRef(false);
   const activeXhrRef = useRef<XMLHttpRequest | null>(null);
   const activeAbortControllerRef = useRef<AbortController | null>(null);
   const uploadPromiseRef = useRef<Promise<number | null> | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+
+  // ── GIF Builder ────────────────────────
+  // GIF dirakit di server lewat ffmpeg (binary yang sudah dipakai /api/convert-video),
+  // bukan di browser, supaya tidak membebani mesin photobooth.
+  const buildGif = useCallback(async (photos: string[]): Promise<Blob | null> => {
+    setGifState("building");
+    try {
+      const formData = new FormData();
+      photos.forEach((photo, index) => {
+        formData.append("frames", dataUrlToBlob(photo), `frame_${index}.jpg`);
+      });
+      formData.append("delayMs", "500");
+      formData.append("width", "480");
+
+      const res = await fetch("/api/make-gif", { method: "POST", body: formData });
+      if (!res.ok || res.headers.get("X-Gif-Success") !== "true") {
+        throw new Error(`GIF gagal dibuat (HTTP ${res.status})`);
+      }
+
+      const gif = new Blob([await res.arrayBuffer()], { type: "image/gif" });
+      setGifUrl(URL.createObjectURL(gif));
+      setGifState("ready");
+      await localforage.setItem("finalGif", gif);
+      console.log(`[Print] GIF siap: ${(gif.size / 1024).toFixed(0)} KB`);
+      return gif;
+    } catch (err) {
+      console.error("[Print] Gagal membuat GIF:", err);
+      setGifState("error");
+      return null;
+    }
+  }, []);
 
   // ── Load Data ──────────────────────────
   useEffect(() => {
@@ -215,7 +251,17 @@ function PrintContent() {
       }
 
       const raw = localStorage.getItem("capturedPhotos") || localStorage.getItem("rawPhotos");
-      if (raw) setRawPhotos(JSON.parse(raw));
+      if (raw) {
+        const parsedPhotos: string[] = JSON.parse(raw);
+        setRawPhotos(parsedPhotos);
+
+        // Bangun GIF sekali di awal. Promise-nya disimpan supaya proses upload
+        // bisa menunggunya tanpa memblokir render halaman.
+        const framesForGif = parsedPhotos.filter(Boolean);
+        if (framesForGif.length > 0) {
+          gifPromiseRef.current = buildGif(framesForGif);
+        }
+      }
 
       // Read template category
       const templatesRaw = localStorage.getItem(`templates_${canvasType}`);
@@ -326,6 +372,18 @@ function PrintContent() {
           }
         });
 
+        // ── Tambahkan GIF ──
+        // Tunggu proses ffmpeg, tapi jangan sampai menggantung upload.
+        const gifBlob = await Promise.race([
+          gifPromiseRef.current ?? Promise.resolve(null),
+          new Promise<null>((r) => setTimeout(() => r(null), 15000)),
+        ]);
+        if (gifBlob) {
+          formData.append("gif", gifBlob, "final.gif");
+        } else {
+          console.warn("[Print] GIF belum siap saat upload — dilewati");
+        }
+
         if (abortController.signal.aborted) throw new Error("Aborted beforehand");
 
         // ── Tambahkan Video Live (converted to MP4 for iOS/Android compatibility) ──
@@ -432,6 +490,7 @@ function PrintContent() {
       });
 
       const finalVideoBlob = await localforage.getItem<Blob>("finalLiveVideo");
+      const finalGifBlob = await localforage.getItem<Blob>("finalGif");
 
       const queueId = "offline_upload_" + Date.now() + "_" + Math.floor(Math.random()*1000);
       const queueData = {
@@ -442,6 +501,7 @@ function PrintContent() {
         finalImageBase64: storedFinalImage,
         photos: payloadPhotos,
         videoBlob: finalVideoBlob || null,
+        gifBlob: finalGifBlob || null,
         timestamp: Date.now()
       };
 
@@ -679,6 +739,7 @@ function PrintContent() {
     // Juga bersihkan localforage (video)
     localforage.removeItem("liveVideos");
     localforage.removeItem("finalLiveVideo");
+    localforage.removeItem("finalGif");
 
     router.push("/");
   };
@@ -728,8 +789,23 @@ function PrintContent() {
              <div className="flex-1 flex items-center justify-center overflow-hidden bg-slate-50 rounded-[1.5rem] relative shadow-inner min-h-0">
                  {previewMode === "photo" ? (
                     <img src={finalImage} alt="Final" className="h-full object-contain select-none animate-in fade-in duration-500" />
+                 ) : previewMode === "gif" && gifUrl ? (
+                    <img src={gifUrl} alt="GIF" className="h-full object-contain select-none animate-in fade-in duration-500" />
                  ) : previewMode === "gif" && rawPhotos.length > 0 ? (
-                    <img src={rawPhotos[currentGifIndex]} alt="GIF Preview" className="h-full object-contain select-none" />
+                    // Fallback selama ffmpeg masih merakit GIF: slideshow foto frame
+                    <div className="relative h-full flex items-center justify-center">
+                       <img src={rawPhotos[currentGifIndex]} alt="GIF Preview" className="h-full object-contain select-none" />
+                       {gifState === "building" && (
+                          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-slate-900/70 text-white text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full">
+                             Membuat GIF...
+                          </div>
+                       )}
+                    </div>
+                 ) : previewMode === "gif" ? (
+                    <div className="flex flex-col items-center text-slate-300 gap-2">
+                       <div className="w-10 h-10 border-4 border-slate-100 border-t-slate-300 rounded-full animate-spin"></div>
+                       <span className="text-[10px] font-black uppercase tracking-widest">Membuat GIF...</span>
+                    </div>
                  ) : finalVideoUrl ? (
                     <video src={finalVideoUrl} autoPlay loop muted className="h-full object-contain select-none animate-in fade-in duration-500" />
                  ) : (

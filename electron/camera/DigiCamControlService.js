@@ -36,6 +36,7 @@ class DigiCamControlService extends ICameraProvider {
     this.name = 'digicamcontrol';
     this.baseUrl = (options.baseUrl || 'http://127.0.0.1:5513').replace(/\/+$/, '');
     this.sessionDir = options.sessionDir || null;
+    this.imageQuality = options.imageQuality || '';
     this.liveViewActive = false;
     this.disposed = false;
     /** @type {Set<AbortController>} semua request HTTP yang masih menggantung */
@@ -160,9 +161,35 @@ class DigiCamControlService extends ICameraProvider {
     }
   }
 
+  /**
+   * Minta kamera memakai ukuran JPEG tertentu (mis. "Medium Fine JPEG").
+   * Nama property berbeda antar model kamera, jadi ini best-effort: kegagalan
+   * tidak pernah membatalkan live view atau capture.
+   */
+  async setImageQuality(value) {
+    if (!value) return { ok: true, skipped: true };
+    try {
+      const res = await this._fetch(
+        `/?slc=set&param1=compressionsetting&param2=${encodeURIComponent(value)}`,
+        { timeout: 4000 }
+      );
+      const text = (res.text || '').trim();
+      const applied = res.ok && !/error|unknown|not\s*found/i.test(text);
+      if (!applied) {
+        console.warn(`[digiCamControl] Kualitas "${value}" tidak diterima kamera: ${text || `HTTP ${res.status}`}`);
+      }
+      return { ok: applied, value, response: text };
+    } catch (err) {
+      console.warn(`[digiCamControl] Gagal set kualitas foto: ${this._describeError(err)}`);
+      return { ok: false, value, error: this._describeError(err) };
+    }
+  }
+
   async startLiveView() {
     const health = await this.healthCheck();
     if (!health.connected) return { ok: false, ...health };
+
+    if (this.imageQuality) await this.setImageQuality(this.imageQuality);
 
     try {
       await this._cmd('LiveViewWnd_Show', { timeout: 5000 });

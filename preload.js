@@ -55,6 +55,10 @@ contextBridge.exposeInMainWorld('camera', {
   // Kunci perpindahan provider selama sesi photobooth berjalan
   setSessionActive: (active) => ipcRenderer.invoke('camera:setSessionActive', active),
 
+  // Ukuran JPEG yang diminta ke kamera (digiCamControl saja)
+  getImageQuality: () => ipcRenderer.invoke('camera:getImageQuality'),
+  setImageQuality: (value) => ipcRenderer.invoke('camera:setImageQuality', value),
+
   // Jembatan agar Main bisa menyuruh renderer menghentikan MediaStream webcam.
   // getUserMedia hanya ada di renderer, jadi Main tidak bisa melakukannya sendiri.
   onWebcamRequest: (callback) => {

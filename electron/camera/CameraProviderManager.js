@@ -40,6 +40,7 @@ class CameraProviderManager {
       return new DigiCamControlService({
         baseUrl: config.readDigiCamUrl(),
         sessionDir: this.currentSessionDir || this.sessionRoot,
+        imageQuality: config.readDigiCamQuality(),
       });
     }
     return new WebcamProviderService({ bridge: this.bridge });
@@ -299,6 +300,24 @@ class CameraProviderManager {
     } catch (err) {
       return { ok: false, error: err.message };
     }
+  }
+
+  getImageQuality() {
+    return config.readDigiCamQuality();
+  }
+
+  /**
+   * Simpan dan terapkan kualitas JPEG kamera. Hanya berpengaruh pada
+   * digiCamControl; provider webcam mengabaikannya.
+   */
+  async setImageQuality(value) {
+    const stored = config.writeDigiCamQuality(value);
+    if (this.provider && typeof this.provider.setImageQuality === 'function') {
+      this.provider.imageQuality = stored;
+      const res = await this.provider.setImageQuality(stored);
+      return { ok: true, value: stored, appliedNow: res.ok, response: res.response };
+    }
+    return { ok: true, value: stored, appliedNow: false };
   }
 
   async shutdown() {

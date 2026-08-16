@@ -57,6 +57,7 @@ Empat sumber latensi, semuanya sudah ditangani:
 | Polling `/liveview.jpg` 12 fps terus jalan selama capture | Frame loop dihentikan saat capture berjalan dan saat preview foto tampil; antrean request lama di-abort sebelum shutter |
 | `healthCheck()` ekstra sebelum setiap capture | Dihapus — live view yang aktif sudah membuktikan web server hidup |
 | Live view mati sendiri setelah shutter | `LiveViewWnd_Show` dikirim ulang tanpa menunggu, jadi frame berikutnya sudah siap |
+| Transfer USB JPEG Large ~7 MB dari kamera (1,5–3 detik) | Settings → Sumber Kamera → "Ukuran Foto Kamera" meminta Medium/Small Fine JPEG lewat `compressionsetting`; best-effort, kamera yang menolak diabaikan tanpa efek samping |
 
 Waktu capture dicatat di log Main Process:
 `[Camera] Capture selesai dalam 2840ms (7.1 MB → 412 KB)`
@@ -67,6 +68,32 @@ diatur menyimpan foto hanya ke SD card sehingga file tidak pernah sampai ke PC.
 Sebagai jaring pengaman, sekali timeout aplikasi mencoba `/preview.jpg` dan hanya
 menerimanya bila isinya berbeda dari foto terakhir — jadi tidak pernah menghasilkan
 frame duplikat.
+
+## Live Photo & GIF
+
+**Durasi countdown** diatur di Settings → Sesi Sesi Foto → "Durasi Hitung Mundur"
+(1–10 detik, default 3, tersimpan di `localStorage.countdownDuration`). Rekaman
+Live Photo berjalan persis selama countdown, jadi mengubah angka ini otomatis
+mengubah panjang video — tidak ada angka yang di-hardcode lagi.
+
+| Provider | Sumber Live Photo |
+|---|---|
+| Webcam Utility | `MediaRecorder` dari `MediaStream` (jalur existing) |
+| DigiCamControl | Frame live view digambar ke canvas 640 px, canvas-nya direkam |
+
+Keduanya menghasilkan `Blob` video dengan bentuk yang sama, masuk ke
+`localforage["liveVideos"]` → dirakit di `/render` jadi `finalLiveVideo` → diunggah
+sebagai field `video`. `/render` dan `/print` tidak perlu tahu provider mana yang dipakai.
+
+**GIF** dirakit dari foto per frame oleh `/api/make-gif` memakai binary ffmpeg yang
+sudah ada di project (500 ms per frame, lebar 480 px, palettegen/paletteuse).
+Dibangun sekali saat `/print` terbuka, ditampilkan di tab GIF, dan diunggah sebagai
+field `gif`. Antrean offline (`BackgroundUploader`) ikut membawanya.
+
+Perubahan sisi server yang menyertainya (`D:\PROJECT_GROUP\roambooth`):
+kolom `final_images.gif_path`, `FinalImage::$appends['gif_url']`, validasi + penyimpanan
+`gif` di `FinalImageController::store`, dan card "Animated GIF" di halaman detail transaksi.
+Jalankan `php artisan migrate` di project itu sebelum GIF bisa tersimpan.
 
 ## Batasan yang disengaja
 

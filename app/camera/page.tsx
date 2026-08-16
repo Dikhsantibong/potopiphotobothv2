@@ -114,6 +114,42 @@ function CameraContent() {
 
 
 
+  // Durasi hitung mundur diatur di Settings. Nilai ini juga menentukan panjang
+
+  // rekaman Live Photo — rekaman berjalan persis selama countdown.
+
+  const [countdownDuration, setCountdownDuration] = useState(3);
+
+  useEffect(() => {
+
+    const saved = localStorage.getItem("countdownDuration");
+
+    const parsed = saved ? parseInt(saved, 10) : NaN;
+
+    if (Number.isFinite(parsed)) setCountdownDuration(Math.min(10, Math.max(1, parsed)));
+
+  }, []);
+
+
+
+  // Perekam Live Photo untuk provider digiCamControl: frame live view digambar
+
+  // ke canvas, lalu canvas-nya direkam. Bentuk hasilnya sama dengan jalur
+
+  // webcam (Blob video), jadi /render dan /print tidak perlu tahu bedanya.
+
+  const liveImgRef = useRef<HTMLImageElement>(null);
+
+  const liveCanvasRef = useRef<HTMLCanvasElement>(null);
+
+  const dccRecorderRef = useRef<MediaRecorder | null>(null);
+
+  const dccChunksRef = useRef<BlobPart[]>([]);
+
+  const dccRafRef = useRef<number | null>(null);
+
+
+
   useEffect(() => {
 
     currentFrameRef.current = currentFrame;
@@ -657,9 +693,183 @@ function CameraContent() {
 
 
 
+  const pickRecorderOptions = (): MediaRecorderOptions => {
+
+    if (MediaRecorder.isTypeSupported('video/mp4; codecs="avc1.42E01E"')) {
+
+      return { mimeType: 'video/mp4; codecs="avc1.42E01E"' };
+
+    }
+
+    if (MediaRecorder.isTypeSupported("video/webm; codecs=h264")) {
+
+      return { mimeType: "video/webm; codecs=h264" };
+
+    }
+
+    if (MediaRecorder.isTypeSupported("video/webm; codecs=vp8")) {
+
+      return { mimeType: "video/webm; codecs=vp8" };
+
+    }
+
+    return { mimeType: "video/webm" };
+
+  };
+
+
+
+  const startDccRecording = () => {
+
+    const img = liveImgRef.current;
+
+    const canvas = liveCanvasRef.current;
+
+    if (!img || !canvas || !img.naturalWidth) return;
+
+    if (dccRecorderRef.current) return;
+
+
+
+    canvas.width = 640;
+
+    canvas.height = Math.max(2, Math.round((640 * img.naturalHeight) / img.naturalWidth));
+
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx) return;
+
+
+
+    const draw = () => {
+
+      const el = liveImgRef.current;
+
+      if (el && el.naturalWidth) {
+
+        ctx.save();
+
+        if (isMirrored) {
+
+          ctx.translate(canvas.width, 0);
+
+          ctx.scale(-1, 1);
+
+        }
+
+        ctx.drawImage(el, 0, 0, canvas.width, canvas.height);
+
+        ctx.restore();
+
+      }
+
+      dccRafRef.current = requestAnimationFrame(draw);
+
+    };
+
+    draw();
+
+
+
+    try {
+
+      const recorder = new MediaRecorder(canvas.captureStream(15), pickRecorderOptions());
+
+      dccChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+
+        if (e.data && e.data.size > 0) dccChunksRef.current.push(e.data);
+
+      };
+
+      recorder.onstop = () => {
+
+        const blob = new Blob(dccChunksRef.current, { type: "video/webm" });
+
+        dccChunksRef.current = [];
+
+        if (dccRafRef.current) cancelAnimationFrame(dccRafRef.current);
+
+        dccRafRef.current = null;
+
+        if (blob.size > 0) {
+
+          setVideos((prev) => {
+
+            const u = [...prev];
+
+            u[currentFrameRef.current] = blob;
+
+            return u;
+
+          });
+
+        }
+
+      };
+
+      dccRecorderRef.current = recorder;
+
+      recorder.start();
+
+    } catch (e) {
+
+      console.error("Gagal memulai rekaman Live Photo digiCamControl", e);
+
+      if (dccRafRef.current) cancelAnimationFrame(dccRafRef.current);
+
+      dccRafRef.current = null;
+
+    }
+
+  };
+
+
+
+  const stopDccRecording = () => {
+
+    const recorder = dccRecorderRef.current;
+
+    dccRecorderRef.current = null;
+
+    if (recorder && recorder.state === "recording") recorder.stop();
+
+    else if (dccRafRef.current) {
+
+      cancelAnimationFrame(dccRafRef.current);
+
+      dccRafRef.current = null;
+
+    }
+
+  };
+
+
+
+  useEffect(() => {
+
+    return () => {
+
+      if (dccRafRef.current) cancelAnimationFrame(dccRafRef.current);
+
+      const recorder = dccRecorderRef.current;
+
+      if (recorder && recorder.state === "recording") recorder.stop();
+
+    };
+
+  }, []);
+
+
+
   const captureFromProvider = async () => {
 
     setCaptureError(null);
+
+    // Hentikan rekaman tepat saat shutter, sama seperti jalur webcam.
+
+    stopDccRecording();
 
     const res = await providerCapture();
 
@@ -833,15 +1043,23 @@ function CameraContent() {
 
     if (countdown === null) return;
 
-    if (countdown === 3) {
+    if (countdown === countdownDuration) {
 
       // Start recording at the beginning of countdown
 
-      if (recorderRef.current && recorderRef.current.state === "inactive") {
+      if (usesWebcam) {
 
-        chunksRef.current = [];
+        if (recorderRef.current && recorderRef.current.state === "inactive") {
 
-        recorderRef.current.start();
+          chunksRef.current = [];
+
+          recorderRef.current.start();
+
+        }
+
+      } else {
+
+        startDccRecording();
 
       }
 
@@ -896,6 +1114,10 @@ function CameraContent() {
     <div className="relative h-screen w-full overflow-hidden bg-[#f15a09] font-sans text-slate-900 flex flex-col p-2 sm:p-3">
 
       <canvas ref={canvasRef} className="hidden" />
+
+      {/* Kanvas perekam Live Photo untuk provider digiCamControl */}
+
+      <canvas ref={liveCanvasRef} className="hidden" />
 
 
 
@@ -972,6 +1194,8 @@ function CameraContent() {
               ) : liveViewUrl ? (
 
                 <img
+
+                  ref={liveImgRef}
 
                   src={liveViewUrl}
 
@@ -1102,7 +1326,7 @@ function CameraContent() {
 
                   <button
 
-                    onClick={() => { if (cameraReady && countdown === null && !isCapturing) { setCaptureError(null); setCountdown(3); } }}
+                    onClick={() => { if (cameraReady && countdown === null && !isCapturing) { setCaptureError(null); setCountdown(countdownDuration); } }}
 
                     className="w-20 h-20 rounded-full bg-white/90 backdrop-blur-md border-[6px] border-[#f15a09] flex items-center justify-center text-[#f15a09] shadow-2xl hover:scale-110 active:scale-95 transition-all group"
 

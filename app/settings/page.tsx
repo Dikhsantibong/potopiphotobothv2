@@ -38,11 +38,13 @@ export default function SettingsPage() {
     flipbook: true
   });
   const [sessionTimeout, setSessionTimeout] = useState<number>(300);
+  const [countdownDuration, setCountdownDuration] = useState<number>(3);
 
   // Camera provider states
   const [cameraProvider, setCameraProvider] = useState<CameraProvider>("webcam");
   const [providerStatus, setProviderStatus] = useState<{ connected: boolean; error?: string; detail?: string } | null>(null);
   const [providerBusy, setProviderBusy] = useState(false);
+  const [imageQuality, setImageQuality] = useState<string>("");
 
   // Queue state
   const [uploadQueue, setUploadQueue] = useState<any[]>([]);
@@ -60,6 +62,8 @@ export default function SettingsPage() {
   const onKeyboardChange = (input: string) => {
     if (focusedInput === "sessionTimeout") {
       setSessionTimeout(parseInt(input) || 0);
+    } else if (focusedInput === "countdownDuration") {
+      setCountdownDuration(parseInt(input) || 0);
     } else if (focusedInput) {
       handleChange(focusedInput, input);
     }
@@ -144,8 +148,33 @@ export default function SettingsPage() {
     } catch {
       /* biarkan default */
     }
+    try {
+      const quality = await api.getImageQuality?.();
+      if (typeof quality === "string") setImageQuality(quality);
+    } catch {
+      /* opsional */
+    }
     await refreshProviderStatus();
   }, [refreshProviderStatus]);
+
+  const handleSelectImageQuality = async (value: string) => {
+    setImageQuality(value);
+    const api = getCameraBridge();
+    if (!api?.setImageQuality) return;
+    try {
+      const res = await api.setImageQuality(value);
+      showToast(
+        !value
+          ? "Kualitas kamera mengikuti pengaturan bawaan"
+          : res?.appliedNow
+            ? `Kualitas kamera diatur ke ${value}`
+            : `Tersimpan. Akan diterapkan saat live view berikutnya`,
+        "success"
+      );
+    } catch (e) {
+      showToast((e as Error).message, "error");
+    }
+  };
 
   const handleSelectProvider = async (name: CameraProvider) => {
     const api = getCameraBridge();
@@ -241,6 +270,9 @@ export default function SettingsPage() {
 
       const savedTimeout = localStorage.getItem("sessionTimeout");
       if (savedTimeout) setSessionTimeout(parseInt(savedTimeout, 10));
+
+      const savedCountdown = localStorage.getItem("countdownDuration");
+      if (savedCountdown) setCountdownDuration(parseInt(savedCountdown, 10));
     } catch (e) {
       console.error("Error fetching hardware:", e);
     }
@@ -342,6 +374,7 @@ export default function SettingsPage() {
     localStorage.setItem("printerOrientation", printerOrientation);
     localStorage.setItem("enabledCanvas", JSON.stringify(enabledCanvas));
     localStorage.setItem("sessionTimeout", sessionTimeout.toString());
+    localStorage.setItem("countdownDuration", Math.min(10, Math.max(1, countdownDuration)).toString());
     showToast("Pengaturan Hardware & Fitur disimpan!", "success");
   };
 
@@ -664,6 +697,27 @@ export default function SettingsPage() {
                       </div>
                     )}
 
+                    {cameraProvider === "digicamcontrol" && (
+                      <div className="mt-2">
+                        <label className="block text-[10px] font-bold text-slate-700 mb-1">Ukuran Foto Kamera</label>
+                        <p className="text-[9px] text-slate-400 mb-1.5">
+                          Pengungkit terbesar kecepatan jepret: JPEG Large ~7 MB butuh 1,5–3 detik transfer USB, Medium ~2,5 MB jauh lebih cepat. Nama pengaturan berbeda antar model — kalau kamera menolak, pilihan ini diabaikan tanpa efek samping.
+                        </p>
+                        <select
+                          value={imageQuality}
+                          onChange={(e) => handleSelectImageQuality(e.target.value)}
+                          disabled={providerBusy}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400 appearance-none bg-no-repeat bg-[right_1rem_center] disabled:opacity-50"
+                          style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")` }}
+                        >
+                          <option value="">Ikuti pengaturan kamera (tidak diubah)</option>
+                          <option value="Small Fine JPEG">Small Fine JPEG (paling cepat)</option>
+                          <option value="Medium Fine JPEG">Medium Fine JPEG (disarankan)</option>
+                          <option value="Large Fine JPEG">Large Fine JPEG (paling lambat)</option>
+                        </select>
+                      </div>
+                    )}
+
                     <div className="mt-2 bg-amber-50/80 border border-amber-200/50 rounded-lg px-3 py-2">
                       <p className="text-[9px] text-amber-700/90 leading-relaxed">
                         Pastikan hanya satu aplikasi (digiCamControl <strong>ATAU</strong> EOS Webcam Utility) yang berjalan
@@ -872,6 +926,41 @@ export default function SettingsPage() {
                  </div>
                </div>
                
+               {/* Countdown Duration */}
+               <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-3 transition-all hover:border-slate-200 hover:shadow-md">
+                 <div className="flex items-start gap-3">
+                   <div className="p-2 bg-orange-50 text-orange-500 rounded-xl shrink-0 mt-0">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 2h4"/><path d="M12 14v-4"/><circle cx="12" cy="14" r="8"/></svg>
+                   </div>
+                   <div className="flex-1 min-w-0">
+                     <label className="block text-[10px] font-bold text-slate-700 mb-1">Durasi Hitung Mundur (Detik)</label>
+                     <p className="text-[9px] text-slate-400 mb-1.5">
+                       Hitung mundur sebelum jepret. Durasi ini juga menentukan panjang rekaman Live Photo — makin lama, makin panjang videonya.
+                     </p>
+                     <div className="flex items-center gap-3">
+                       <input
+                         type="number"
+                         min={1}
+                         max={10}
+                         value={countdownDuration}
+                         onFocus={() => onInputFocus("countdownDuration", countdownDuration.toString())}
+                         onChange={(e) => {
+                           setCountdownDuration(parseInt(e.target.value) || 0);
+                           if (keyboardRef.current && focusedInput === "countdownDuration") {
+                             keyboardRef.current.setInput(e.target.value);
+                           }
+                         }}
+                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-mono text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-400/40 focus:border-orange-400 transition-all"
+                       />
+                       <span className="text-[10px] font-bold text-slate-400 shrink-0 whitespace-nowrap">Live ≈ {Math.min(10, Math.max(1, countdownDuration))}s</span>
+                     </div>
+                     {(countdownDuration < 1 || countdownDuration > 10) && (
+                       <p className="text-[9px] text-rose-500 mt-1.5 font-bold">Nilai akan dibatasi ke rentang 1–10 detik saat disimpan.</p>
+                     )}
+                   </div>
+                 </div>
+               </div>
+
                 <p className="px-2 text-[10px] text-slate-400 italic">
                   Catatan: Waktu ini akan digunakan saat mulai sesi foto baru setelah pembayaran.
                 </p>
