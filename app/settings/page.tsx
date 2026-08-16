@@ -45,6 +45,7 @@ export default function SettingsPage() {
   const [providerStatus, setProviderStatus] = useState<{ connected: boolean; error?: string; detail?: string } | null>(null);
   const [providerBusy, setProviderBusy] = useState(false);
   const [imageQuality, setImageQuality] = useState<string>("");
+  const [shutterCommand, setShutterCommand] = useState<string>("CaptureNoAf");
 
   // Queue state
   const [uploadQueue, setUploadQueue] = useState<any[]>([]);
@@ -53,6 +54,10 @@ export default function SettingsPage() {
   const [updateStatus, setUpdateStatus] = useState<"idle" | "checking" | "available" | "not-available" | "downloading" | "ready" | "error">("idle");
   const [updateProgress, setUpdateProgress] = useState<number>(0);
   const [updateMessage, setUpdateMessage] = useState<string>("");
+  const [appVersion, setAppVersion] = useState<string>("");
+  const [isPackaged, setIsPackaged] = useState<boolean>(true);
+  const [latestVersion, setLatestVersion] = useState<string>("");
+  const [lastCheckedAt, setLastCheckedAt] = useState<string>("");
 
   // Keyboard state
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
@@ -154,8 +159,31 @@ export default function SettingsPage() {
     } catch {
       /* opsional */
     }
+    try {
+      const shutter = await api.getShutterCommand?.();
+      if (typeof shutter === "string" && shutter) setShutterCommand(shutter);
+    } catch {
+      /* opsional */
+    }
     await refreshProviderStatus();
   }, [refreshProviderStatus]);
+
+  const handleSelectShutter = async (value: string) => {
+    setShutterCommand(value);
+    const api = getCameraBridge();
+    if (!api?.setShutterCommand) return;
+    try {
+      await api.setShutterCommand(value);
+      showToast(
+        value === "CaptureNoAf"
+          ? "Shutter tanpa autofokus — foto jatuh tepat di akhir countdown"
+          : "Shutter dengan autofokus — ada jeda sebelum jepret",
+        "success"
+      );
+    } catch (e) {
+      showToast((e as Error).message, "error");
+    }
+  };
 
   const handleSelectImageQuality = async (value: string) => {
     setImageQuality(value);
@@ -295,14 +323,26 @@ export default function SettingsPage() {
 
     if (typeof window !== "undefined" && (window as any).electron) {
       const electron = (window as any).electron;
-      
+
+      electron.getAppVersion && electron.getAppVersion().then((info: any) => {
+        if (info?.version) setAppVersion(info.version);
+        if (typeof info?.packaged === "boolean") setIsPackaged(info.packaged);
+      }).catch(() => { });
+
       electron.onUpdateAvailable && electron.onUpdateAvailable((info: any) => {
         setUpdateStatus("available");
+        setLatestVersion(info?.version || "");
+        setLastCheckedAt(new Date().toLocaleString("id-ID"));
         setUpdateMessage(`Versi baru (${info.version}) tersedia!`);
       });
 
-      electron.onUpdateNotAvailable && electron.onUpdateNotAvailable(() => {
+      electron.onUpdateNotAvailable && electron.onUpdateNotAvailable((info: any) => {
         setUpdateStatus("not-available");
+        // electron-updater mengirim versi rilis terbaru yang ditemukan di GitHub,
+        // walaupun sama dengan versi terpasang — berguna untuk memastikan
+        // release baru memang belum terbit.
+        if (info?.version) setLatestVersion(info.version);
+        setLastCheckedAt(new Date().toLocaleString("id-ID"));
         setUpdateMessage("Aplikasi sudah versi terbaru.");
       });
 
@@ -699,6 +739,30 @@ export default function SettingsPage() {
 
                     {cameraProvider === "digicamcontrol" && (
                       <div className="mt-2">
+                        <label className="block text-[10px] font-bold text-slate-700 mb-1">Mode Shutter</label>
+                        <p className="text-[9px] text-slate-400 mb-1.5">
+                          Tanpa autofokus, shutter jatuh seketika di akhir countdown. Dengan autofokus, kamera mencari fokus dulu sehingga momen foto bisa meleset 1–3 detik dari pose.
+                        </p>
+                        <select
+                          value={shutterCommand}
+                          onChange={(e) => handleSelectShutter(e.target.value)}
+                          disabled={providerBusy}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400 appearance-none bg-no-repeat bg-[right_1rem_center] disabled:opacity-50"
+                          style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")` }}
+                        >
+                          <option value="CaptureNoAf">Tanpa autofokus — tepat waktu (disarankan)</option>
+                          <option value="Capture">Dengan autofokus — lebih tajam, ada jeda</option>
+                        </select>
+                        {shutterCommand === "CaptureNoAf" && (
+                          <p className="text-[9px] text-slate-400 mt-1.5 italic">
+                            Kamera difokuskan sekali saat countdown dimulai. Kalau hasil sering blur, atur lensa ke MF dengan fokus tetap di posisi berdiri tamu, atau pindah ke mode autofokus.
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {cameraProvider === "digicamcontrol" && (
+                      <div className="mt-2">
                         <label className="block text-[10px] font-bold text-slate-700 mb-1">Ukuran Foto Kamera</label>
                         <p className="text-[9px] text-slate-400 mb-1.5">
                           Pengungkit terbesar kecepatan jepret: JPEG Large ~7 MB butuh 1,5–3 detik transfer USB, Medium ~2,5 MB jauh lebih cepat. Nama pengaturan berbeda antar model — kalau kamera menolak, pilihan ini diabaikan tanpa efek samping.
@@ -1026,6 +1090,40 @@ export default function SettingsPage() {
                </div>
 
                <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-3">
+                 {/* Versi aplikasi — supaya jelas versi mana yang sedang berjalan */}
+                 <div className="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-slate-100">
+                   <div className="min-w-0">
+                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Versi Terpasang</p>
+                     <p className="text-lg font-black text-slate-800 tabular-nums leading-tight">
+                       {appVersion ? `v${appVersion}` : "—"}
+                     </p>
+                     {!isPackaged && (
+                       <p className="text-[9px] text-amber-600 font-bold mt-0.5">Mode development — auto-update nonaktif</p>
+                     )}
+                   </div>
+                   <div className="text-right min-w-0">
+                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Rilis Terbaru</p>
+                     <p className={`text-lg font-black tabular-nums leading-tight ${
+                       latestVersion && appVersion && latestVersion !== appVersion ? "text-emerald-600" : "text-slate-400"
+                     }`}>
+                       {latestVersion ? `v${latestVersion}` : "belum dicek"}
+                     </p>
+                     {lastCheckedAt && (
+                       <p className="text-[9px] text-slate-400 mt-0.5">Dicek: {lastCheckedAt}</p>
+                     )}
+                   </div>
+                 </div>
+
+                 {latestVersion && appVersion && latestVersion === appVersion && (
+                   <div className="mb-3 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                     <p className="text-[9px] text-slate-600 leading-relaxed">
+                       Rilis terbaru di GitHub sama dengan versi terpasang. Kalau Anda baru saja push kode,
+                       naikkan dulu <strong>version</strong> di <code className="font-mono">package.json</code> —
+                       workflow melewati build kalau tag untuk versi itu sudah ada.
+                     </p>
+                   </div>
+                 )}
+
                  <div className="mb-3">
                    <p className="text-[10px] font-bold text-slate-700">Status Update OTA</p>
                    {updateMessage && <p className="text-[9px] text-slate-500 mt-0.5">{updateMessage}</p>}

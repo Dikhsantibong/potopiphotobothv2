@@ -36,11 +36,32 @@ jobs:
         run: |
           if gh release view "${{ steps.ver.outputs.tag }}" >/dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "Release ${{ steps.ver.outputs.tag }} sudah ada -> build dilewati."
+            {
+              echo "## Build DILEWATI"
+              echo ""
+              echo "Release **${{ steps.ver.outputs.tag }}** sudah ada di GitHub, jadi tidak ada installer baru yang diterbitkan."
+              echo ""
+              echo "Aplikasi yang sudah terpasang akan tetap melaporkan *\"tidak ada pembaruan\"* sampai versi dinaikkan."
+              echo ""
+              echo "**Cara memperbaiki:** naikkan \`version\` di \`package.json\` (dan samakan di \`package-lock.json\`), lalu push lagi."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning title=Build dilewati::Release ${{ steps.ver.outputs.tag }} sudah ada. Naikkan version di package.json agar installer baru terbit."
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
             echo "Release ${{ steps.ver.outputs.tag }} belum ada -> lanjut build."
           fi
+
+      - name: Pastikan versi package.json dan package-lock.json sama
+        if: steps.check.outputs.exists == 'false'
+        shell: bash
+        run: |
+          PKG=$(node -p "require('./package.json').version")
+          LOCK=$(node -p "require('./package-lock.json').version")
+          if [ "$PKG" != "$LOCK" ]; then
+            echo "::error title=Versi tidak sinkron::package.json=$PKG tetapi package-lock.json=$LOCK. Jalankan 'npm install --package-lock-only' lalu commit ulang."
+            exit 1
+          fi
+          echo "Versi sinkron: $PKG"
 
       - name: Install Node.js
         if: steps.check.outputs.exists == 'false'

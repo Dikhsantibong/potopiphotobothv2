@@ -47,6 +47,36 @@ di-set eksplisit ke digiCamControl lewat `session.folder` saat sesi dimulai.
 3. Tutup EOS Webcam Utility — dua aplikasi tidak bisa memegang device USB yang sama.
 4. Verifikasi: `npm run test:digicam`
 
+## Momen jepret & metadata kamera
+
+Jepret dipecah jadi tiga tahap supaya foto jatuh **tepat di akhir countdown**,
+bukan di akhir loading:
+
+| Tahap | Kapan | Isi |
+|---|---|---|
+| `armCapture()` | countdown mulai | pastikan live view hidup, ambil baseline `lastcaptured`, fokuskan kamera |
+| `fireShutter()` | countdown = 0 | **satu request saja** — `CMD=CaptureNoAf` |
+| `collectPhoto()` | setelah shutter | poll `lastcaptured`, unduh, simpan |
+
+Penyebab lama: `CMD=Capture` menjalankan autofokus sebelum membuka shutter, jadi
+momen foto meleset 1–3 detik dari pose. Sekarang default-nya `CaptureNoAf` dan
+fokus dilakukan saat countdown mulai. Bisa diganti di Settings → Sumber Kamera →
+"Mode Shutter" kalau hasilnya sering blur.
+
+Flash layar sekarang muncul segera setelah shutter jatuh, bukan setelah file
+selesai diunduh, sehingga user tahu momen mana yang terekam.
+
+**Metadata EXIF.** `nativeImage.toJPEG()` membuang seluruh metadata, jadi lapisan
+IPC menyalin segmen APP1/Exif dari JPEG asli kamera ke hasil resize — merek,
+model, ISO, shutter speed, lensa, dan waktu pemotretan tetap terbaca di
+"Details" File Explorer. Foto berukuran ≤1920 px dikirim apa adanya tanpa
+re-encode sama sekali.
+
+Dengan mirror **mati** (default untuk digiCamControl), foto tidak pernah melewati
+canvas renderer, jadi yang tersimpan benar-benar file dari kamera. Menyalakan
+mirror memaksa re-encode lewat canvas dan metadata akan hilang. File resolusi
+penuh selalu tersimpan utuh di `<userData>/camera-sessions/<timestamp>/`.
+
 ## Kenapa capture bisa terasa lambat
 
 Empat sumber latensi, semuanya sudah ditangani:

@@ -439,7 +439,11 @@ function CameraContent() {
 
     resumeFrames,
 
-    capture: providerCapture,
+    armCapture,
+
+    fireShutter,
+
+    collectPhoto,
 
     isCapturing,
 
@@ -504,6 +508,26 @@ function CameraContent() {
     };
 
   }, [providerReady, usesWebcam, startLiveView, stopLiveView]);
+
+
+
+  // Provider digiCamControl memberi gambar langsung dari sensor kamera. Mirror
+
+  // dimatikan secara default supaya hasilnya benar-benar file dari kamera —
+
+  // tanpa re-encode canvas, sehingga EXIF (kamera, ISO, shutter, lensa) utuh.
+
+  // User tetap bisa menyalakannya lewat tombol mirror bila ingin cocok persis
+
+  // dengan preview, dengan konsekuensi metadata hilang.
+
+  useEffect(() => {
+
+    if (!providerReady || usesWebcam) return;
+
+    setIsMirrored(false);
+
+  }, [providerReady, usesWebcam]);
 
 
 
@@ -651,33 +675,25 @@ function CameraContent() {
 
 
 
-        const CAMERA_ZOOM = 1.08;
+        // Tidak ada crop zoom di sini: 1.08 dipakai jalur webcam untuk memotong
+
+        // black bar EOS Webcam Utility, sedangkan digiCamControl memberi frame
+
+        // penuh dari sensor kamera.
 
         const w = canvas.width;
 
         const h = canvas.height;
 
-        const sw = w / CAMERA_ZOOM;
-
-        const sh = h / CAMERA_ZOOM;
-
-        const sx = (w - sw) / 2;
-
-        const sy = (h - sh) / 2;
 
 
+        ctx.translate(w, 0);
 
-        if (isMirrored) {
+        ctx.scale(-1, 1);
 
-          ctx.translate(w, 0);
+        ctx.drawImage(img, 0, 0, w, h);
 
-          ctx.scale(-1, 1);
-
-        }
-
-        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
-
-        if (isMirrored) ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
 
 
 
@@ -871,7 +887,39 @@ function CameraContent() {
 
     stopDccRecording();
 
-    const res = await providerCapture();
+
+
+    // 1. Momen jepret — satu request, tanpa persiapan apa pun. Persiapan sudah
+
+    //    dilakukan armCapture() saat countdown mulai.
+
+    const fired = await fireShutter();
+
+
+
+    // 2. Flash langsung setelah shutter jatuh, bukan setelah file selesai
+
+    //    diunduh — supaya user tahu momen mana yang terekam.
+
+    setFlashActive(true);
+
+    setTimeout(() => setFlashActive(false), 150);
+
+
+
+    if (!fired?.ok) {
+
+      setCaptureError(fired?.error || "Kamera tidak merespon, coba lagi");
+
+      return;
+
+    }
+
+
+
+    // 3. Baru ambil filenya. Durasi langkah ini tidak lagi menggeser momen foto.
+
+    const res = await collectPhoto();
 
     if (!res?.ok || !res.dataUrl) {
 
@@ -881,9 +929,19 @@ function CameraContent() {
 
     }
 
+
+
     try {
 
-      const processed = await processProviderJpeg(res.dataUrl);
+      // Tanpa mirror, JPEG kamera dipakai apa adanya — resolusi, warna, dan
+
+      // metadata EXIF (merek kamera, ISO, shutter, lensa) tetap utuh karena
+
+      // tidak pernah melewati canvas. Crop 1.08 juga tidak diterapkan: itu
+
+      // khusus menghilangkan black bar EOS Webcam Utility.
+
+      const processed = isMirrored ? await processProviderJpeg(res.dataUrl) : res.dataUrl;
 
       setPhotos((prev) => {
 
@@ -894,10 +952,6 @@ function CameraContent() {
         return u;
 
       });
-
-      setFlashActive(true);
-
-      setTimeout(() => setFlashActive(false), 150);
 
       setShowPreview(true);
 
@@ -1060,6 +1114,12 @@ function CameraContent() {
       } else {
 
         startDccRecording();
+
+        // Siapkan kamera sekarang, selagi user masih menunggu countdown:
+
+        // live view dipastikan hidup, baseline file diambil, kamera difokuskan.
+
+        void armCapture();
 
       }
 

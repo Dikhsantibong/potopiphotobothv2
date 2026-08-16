@@ -17,7 +17,8 @@
     "lint": "eslint",
     "dist": "npm run build && electron-builder",
     "test:digicam": "node scripts/test-digicam.mjs",
-    "test:camera-config": "node scripts/test-camera-config.mjs"
+    "test:camera-config": "node scripts/test-camera-config.mjs",
+    "test:exif": "node scripts/test-exif.mjs"
   },
   "dependencies": {
     "@ffmpeg/core": "^0.12.6",

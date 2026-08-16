@@ -135,10 +135,60 @@ function writeDigiCamQuality(value) {
   return existing.DIGICAM_QUALITY;
 }
 
+/**
+ * Perintah shutter digiCamControl.
+ *
+ * 'CaptureNoAf' (default) menjatuhkan shutter seketika — foto benar-benar jatuh
+ * di akhir countdown. 'Capture' menjalankan autofokus lebih dulu, yang bisa
+ * menggeser momen jepret 1–3 detik.
+ */
+const SHUTTER_COMMANDS = ['CaptureNoAf', 'Capture'];
+const DEFAULT_SHUTTER = 'CaptureNoAf';
+
+function readDigiCamShutter() {
+  const pick = (value) => (SHUTTER_COMMANDS.includes((value || '').trim()) ? value.trim() : null);
+
+  const fromEnv = pick(process.env.DIGICAM_SHUTTER);
+  if (fromEnv) return fromEnv;
+
+  try {
+    const envPath = getEnvPath();
+    if (fs.existsSync(envPath)) {
+      const fromFile = pick(parseEnvContent(fs.readFileSync(envPath, 'utf-8')).DIGICAM_SHUTTER);
+      if (fromFile) return fromFile;
+    }
+  } catch {
+    /* pakai default */
+  }
+  return DEFAULT_SHUTTER;
+}
+
+function writeDigiCamShutter(value) {
+  const normalized = SHUTTER_COMMANDS.includes(value) ? value : DEFAULT_SHUTTER;
+  const envPath = getEnvPath();
+  let existing = {};
+  try {
+    if (fs.existsSync(envPath)) {
+      existing = parseEnvContent(fs.readFileSync(envPath, 'utf-8'));
+    }
+  } catch {
+    /* file baru */
+  }
+  existing.DIGICAM_SHUTTER = normalized;
+  fs.mkdirSync(path.dirname(envPath), { recursive: true });
+  fs.writeFileSync(envPath, buildEnvContent(existing), 'utf-8');
+  process.env.DIGICAM_SHUTTER = normalized;
+  return normalized;
+}
+
 module.exports = {
   KEY,
   PROVIDERS,
   DEFAULT_PROVIDER,
+  SHUTTER_COMMANDS,
+  DEFAULT_SHUTTER,
+  readDigiCamShutter,
+  writeDigiCamShutter,
   readDigiCamQuality,
   writeDigiCamQuality,
   isValidProvider,

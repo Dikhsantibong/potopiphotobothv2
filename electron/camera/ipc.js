@@ -20,6 +20,54 @@ const { CameraProviderManager } = require('./CameraProviderManager');
 const MAX_CAPTURE_WIDTH = 1920;
 const CAPTURE_JPEG_QUALITY = 92;
 
+/**
+ * Ambil segmen APP1/Exif dari JPEG asli kamera.
+ *
+ * nativeImage.toJPEG() membuang seluruh metadata, jadi tanpa ini foto hasil
+ * resize kehilangan merek/model kamera, ISO, shutter speed, lensa, dan waktu
+ * pemotretan — persis yang dicari saat membuka "Details" di File Explorer.
+ */
+function extractExifSegment(buffer) {
+  if (!buffer || buffer.length < 4 || buffer[0] !== 0xff || buffer[1] !== 0xd8) return null;
+
+  let offset = 2;
+  while (offset + 4 <= buffer.length) {
+    if (buffer[offset] !== 0xff) break;
+    const marker = buffer[offset + 1];
+
+    // Marker tanpa payload
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd9)) {
+      offset += 2;
+      continue;
+    }
+    // Mulai data gambar — EXIF pasti sudah lewat
+    if (marker === 0xda) break;
+
+    const length = buffer.readUInt16BE(offset + 2);
+    if (length < 2 || offset + 2 + length > buffer.length) break;
+
+    if (marker === 0xe1 && buffer.subarray(offset + 4, offset + 10).toString('latin1') === 'Exif\0\0') {
+      return buffer.subarray(offset, offset + 2 + length);
+    }
+    offset += 2 + length;
+  }
+  return null;
+}
+
+/** Sisipkan kembali segmen Exif ke JPEG hasil re-encode. */
+function insertExifSegment(jpeg, exifSegment) {
+  if (!exifSegment || !jpeg || jpeg[0] !== 0xff || jpeg[1] !== 0xd8) return jpeg;
+
+  // Exif harus berada tepat setelah SOI, atau setelah APP0/JFIF bila ada.
+  let insertAt = 2;
+  if (jpeg.length > 4 && jpeg[2] === 0xff && jpeg[3] === 0xe0) {
+    insertAt = 4 + jpeg.readUInt16BE(4);
+    if (insertAt > jpeg.length) insertAt = 2;
+  }
+
+  return Buffer.concat([jpeg.subarray(0, insertAt), exifSegment, jpeg.subarray(insertAt)])
+}
+
 function toDisplayJpeg(buffer) {
   try {
     const { nativeImage } = require('electron');
@@ -27,12 +75,14 @@ function toDisplayJpeg(buffer) {
     if (image.isEmpty()) return buffer;
 
     const size = image.getSize();
-    if (size.width > MAX_CAPTURE_WIDTH) {
-      image = image.resize({ width: MAX_CAPTURE_WIDTH, quality: 'good' });
-    }
+    if (size.width <= MAX_CAPTURE_WIDTH) return buffer; // sudah kecil: pertahankan file asli apa adanya
 
+    image = image.resize({ width: MAX_CAPTURE_WIDTH, quality: 'good' });
     const jpeg = image.toJPEG(CAPTURE_JPEG_QUALITY);
-    if (jpeg && jpeg.length > 1024) return jpeg;
+    if (!jpeg || jpeg.length <= 1024) return buffer;
+
+    // Tempelkan kembali data kamera yang dibuang oleh toJPEG().
+    return insertExifSegment(jpeg, extractExifSegment(buffer));
   } catch (err) {
     console.warn('[Camera] Resize foto gagal, memakai ukuran asli:', err.message);
   }
@@ -94,19 +144,41 @@ function registerCameraIpc({ ipcMain, getWindow, sessionRoot }) {
   ipcMain.handle('camera:getStatus', () => manager.getStatus());
   ipcMain.handle('camera:startLiveView', () => manager.startLiveView());
   ipcMain.handle('camera:stopLiveView', () => manager.stopLiveView());
-  ipcMain.handle('camera:capture', async () => {
-    const started = Date.now();
-    const res = await manager.capture();
+  function packPhoto(res, started, label) {
     if (!res || !res.ok || !res.buffer) return res;
-
     const { buffer, ...rest } = res;
     const jpeg = toDisplayJpeg(buffer);
     console.log(
-      `[Camera] Capture selesai dalam ${Date.now() - started}ms ` +
-      `(${(buffer.length / 1024 / 1024).toFixed(1)} MB → ${(jpeg.length / 1024).toFixed(0)} KB)`
+      `[Camera] ${label} selesai dalam ${Date.now() - started}ms ` +
+      `(${(buffer.length / 1024 / 1024).toFixed(1)} MB → ${(jpeg.length / 1024).toFixed(0)} KB` +
+      `${jpeg === buffer ? ', file asli' : ', EXIF dipertahankan'})`
     );
     return { ...rest, dataUrl: `data:image/jpeg;base64,${jpeg.toString('base64')}` };
+  }
+
+  ipcMain.handle('camera:capture', async () => {
+    const started = Date.now();
+    return packPhoto(await manager.capture(), started, 'Capture');
   });
+
+  // Alur terpisah: shutter jatuh tepat di akhir countdown, pengambilan file
+  // berjalan setelahnya tanpa menggeser momen foto.
+  ipcMain.handle('camera:armCapture', () => manager.armCapture());
+
+  ipcMain.handle('camera:fireShutter', async () => {
+    const started = Date.now();
+    const res = await manager.fireShutter();
+    console.log(`[Camera] Shutter ${res?.ok ? 'jatuh' : 'GAGAL'} dalam ${Date.now() - started}ms (${res?.command || '-'})`);
+    return res;
+  });
+
+  ipcMain.handle('camera:collectPhoto', async () => {
+    const started = Date.now();
+    return packPhoto(await manager.collectPhoto(), started, 'Ambil file');
+  });
+
+  ipcMain.handle('camera:getShutterCommand', () => manager.getShutterCommand());
+  ipcMain.handle('camera:setShutterCommand', (_e, value) => manager.setShutterCommand(value));
   ipcMain.handle('camera:getLastCaptured', () => manager.getLastCaptured());
   ipcMain.handle('camera:downloadPhoto', (_e, filename) => manager.downloadPhoto(filename));
   ipcMain.handle('camera:getProvider', () => manager.getProvider());

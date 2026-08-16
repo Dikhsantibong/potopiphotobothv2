@@ -37,7 +37,12 @@ class DigiCamControlService extends ICameraProvider {
     this.baseUrl = (options.baseUrl || 'http://127.0.0.1:5513').replace(/\/+$/, '');
     this.sessionDir = options.sessionDir || null;
     this.imageQuality = options.imageQuality || '';
+    // 'CaptureNoAf' = shutter jatuh seketika; 'Capture' = autofokus dulu (ada jeda).
+    this.shutterCommand = options.shutterCommand === 'Capture' ? 'Capture' : 'CaptureNoAf';
     this.liveViewActive = false;
+    /** Nama file terakhir sebelum shutter — diambil saat arm, bukan saat jepret. */
+    this.armedBaseline = null;
+    this.armed = false;
     this.disposed = false;
     /** @type {Set<AbortController>} semua request HTTP yang masih menggantung */
     this.pending = new Set();
@@ -309,33 +314,75 @@ class DigiCamControlService extends ICameraProvider {
   }
 
   /**
-   * Trigger shutter → tunggu lastcaptured berubah → unduh → simpan ke folder sesi.
-   * @returns {Promise<{ok:boolean, filePath?:string, dataUrl?:string, filename?:string, error?:string}>}
+   * Siapkan segalanya SEBELUM momen jepret, dipanggil saat countdown mulai.
+   *
+   * Semua pekerjaan yang bisa menunda shutter dikerjakan di sini: memastikan
+   * live view hidup, mengambil baseline `lastcaptured`, dan menyuruh kamera
+   * fokus. Dengan begitu fireShutter() nanti benar-benar hanya satu request.
    */
-  async capture({ sessionDir, timeoutMs = 12000, pollIntervalMs = 250 } = {}) {
-    const targetDir = sessionDir || this.sessionDir;
-
-    // Tidak ada health check terpisah di sini: live view yang aktif sudah
-    // membuktikan web server hidup, dan satu round trip ekstra ke web server
-    // yang melayani request secara berurutan langsung terasa di UI.
+  async armCapture() {
     if (!this.liveViewActive) {
       const lv = await this.startLiveView();
       if (!lv.ok) return { ok: false, code: 'LIVEVIEW_FAILED', error: lv.error };
     }
 
-    // Kosongkan antrean /liveview.jpg supaya web server fokus melayani
-    // Capture dan transfer file.
-    this._abortPending();
-
-    const before = (await this.getLastCaptured()).filename;
-
     try {
-      await this._cmd('Capture', { timeout: 8000 });
-    } catch (err) {
-      return { ok: false, code: 'CAPTURE_FAILED', error: `Shutter gagal dipicu (${this._describeError(err)})` };
+      this.armedBaseline = (await this.getLastCaptured()).filename;
+    } catch {
+      this.armedBaseline = null;
     }
 
-    // Respons HTTP dari Capture TIDAK berarti JPG sudah jadi — harus di-poll.
+    // Fokus dilakukan sekarang, selama user masih menunggu countdown, supaya
+    // shutter nanti tidak perlu menunggu autofokus. Best-effort.
+    if (this.shutterCommand === 'CaptureNoAf') {
+      this._cmd('LiveViewWnd_Focus', { timeout: 3000 }).catch(() => { });
+    }
+
+    this.armed = true;
+    return { ok: true, baseline: this.armedBaseline };
+  }
+
+  /**
+   * Momen jepret. Hanya satu request, tanpa persiapan apa pun, supaya foto
+   * jatuh tepat di akhir countdown.
+   */
+  async fireShutter() {
+    const startedAt = Date.now();
+
+    // Bebaskan antrean /liveview.jpg agar request shutter tidak mengantre.
+    this._abortPending();
+
+    if (!this.armed) {
+      // Dipanggil tanpa arm (mis. dari alur lama) — ambil baseline seadanya.
+      try {
+        this.armedBaseline = (await this.getLastCaptured()).filename;
+      } catch {
+        this.armedBaseline = null;
+      }
+    }
+
+    try {
+      await this._cmd(this.shutterCommand, { timeout: 8000 });
+      this.armed = false;
+      return { ok: true, command: this.shutterCommand, elapsed: Date.now() - startedAt };
+    } catch (err) {
+      this.armed = false;
+      return {
+        ok: false,
+        code: 'CAPTURE_FAILED',
+        error: `Shutter gagal dipicu (${this._describeError(err)})`,
+      };
+    }
+  }
+
+  /**
+   * Ambil file hasil jepretan. Dijalankan SETELAH shutter, jadi durasinya tidak
+   * lagi menggeser momen foto — hanya menunda tampilnya preview.
+   */
+  async collectPhoto({ sessionDir, timeoutMs = 12000, pollIntervalMs = 250 } = {}) {
+    const targetDir = sessionDir || this.sessionDir;
+    const before = this.armedBaseline;
+
     const deadline = Date.now() + timeoutMs;
     let filename = null;
     let wait = 150; // cek pertama lebih cepat; sisanya pakai interval normal
@@ -414,9 +461,24 @@ class DigiCamControlService extends ICameraProvider {
     return result;
   }
 
+  /**
+   * Alur lengkap dalam satu panggilan. Tetap disediakan agar pemanggil yang
+   * tidak memisahkan arm/fire/collect (mis. test) tetap bekerja.
+   */
+  async capture(options = {}) {
+    const armed = await this.armCapture();
+    if (!armed.ok) return armed;
+
+    const fired = await this.fireShutter();
+    if (!fired.ok) return fired;
+
+    return this.collectPhoto(options);
+  }
+
   async dispose() {
     this.disposed = true;
     this.liveViewActive = false;
+    this.armed = false;
     this._abortPending();
   }
 }

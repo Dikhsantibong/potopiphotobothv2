@@ -90,6 +90,19 @@ class WebcamProviderService extends ICameraProvider {
     return { ...RENDERER_OWNED };
   }
 
+  async armCapture() {
+    // Webcam tidak punya shutter fisik yang perlu disiapkan.
+    return { ok: true, skipped: true, provider: this.name };
+  }
+
+  async fireShutter() {
+    return { ...RENDERER_OWNED };
+  }
+
+  async collectPhoto() {
+    return { ...RENDERER_OWNED };
+  }
+
   async getFrame() {
     return { ...RENDERER_OWNED };
   }

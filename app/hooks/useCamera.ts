@@ -48,6 +48,11 @@ interface CameraBridge {
   startLiveView: () => Promise<{ ok: boolean; error?: string }>;
   stopLiveView: () => Promise<{ ok: boolean }>;
   capture: () => Promise<{ ok: boolean; dataUrl?: string; filePath?: string; error?: string }>;
+  armCapture: () => Promise<{ ok: boolean; error?: string }>;
+  fireShutter: () => Promise<{ ok: boolean; command?: string; error?: string }>;
+  collectPhoto: () => Promise<{ ok: boolean; dataUrl?: string; filePath?: string; error?: string }>;
+  getShutterCommand: () => Promise<string>;
+  setShutterCommand: (value: string) => Promise<{ ok: boolean; value: string }>;
   getFrame: () => Promise<{ ok: boolean; data?: Uint8Array; mime?: string; error?: string }>;
   getLastCaptured: () => Promise<{ ok: boolean; filename: string | null }>;
   downloadPhoto: (filename: string) => Promise<{ ok: boolean; dataUrl?: string; error?: string }>;
@@ -280,6 +285,52 @@ export function useCamera(options: UseCameraOptions = {}) {
     return bridge.stopLiveView();
   }, [activeProvider, stopFrameLoop]);
 
+  /**
+   * Siapkan kamera saat countdown mulai: live view dipastikan hidup, baseline
+   * file diambil, dan kamera difokuskan. Semua pekerjaan yang bisa menunda
+   * shutter dikerjakan di sini, bukan di detik nol.
+   */
+  const armCapture = useCallback(async () => {
+    const bridge = getCameraBridge();
+    if (!bridge?.armCapture) return { ok: true, skipped: true };
+    try {
+      return await bridge.armCapture();
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  }, []);
+
+  /** Momen jepret. Sengaja tidak menyentuh state agar tidak menunda apa pun. */
+  const fireShutter = useCallback(async () => {
+    const bridge = getCameraBridge();
+    if (!bridge?.fireShutter) return { ok: false, error: "Bridge kamera tidak tersedia" };
+    stopFrameLoop();
+    try {
+      return await bridge.fireShutter();
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  }, [stopFrameLoop]);
+
+  /** Ambil file hasil jepretan — berjalan setelah momen foto, bukan sebelumnya. */
+  const collectPhoto = useCallback(async () => {
+    const bridge = getCameraBridge();
+    if (!bridge?.collectPhoto) return { ok: false, error: "Bridge kamera tidak tersedia" };
+    setIsCapturing(true);
+    setError(null);
+    try {
+      const res = await bridge.collectPhoto();
+      if (!res?.ok) setError(res?.error || "Foto gagal diambil dari kamera");
+      return res;
+    } catch (e) {
+      const message = (e as Error).message;
+      setError(message);
+      return { ok: false, error: message };
+    } finally {
+      setIsCapturing(false);
+    }
+  }, []);
+
   const capture = useCallback(async () => {
     const bridge = getCameraBridge();
     if (!bridge) return { ok: false, error: "Bridge kamera tidak tersedia" };
@@ -339,6 +390,9 @@ export function useCamera(options: UseCameraOptions = {}) {
     pauseFrames,
     resumeFrames,
     capture,
+    armCapture,
+    fireShutter,
+    collectPhoto,
     /** true bila halaman harus memakai flow getUserMedia existing */
     usesWebcam: activeProvider === "webcam",
   };

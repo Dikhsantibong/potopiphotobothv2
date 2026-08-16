@@ -4,6 +4,9 @@ contextBridge.exposeInMainWorld('electron', {
   restartApp: () => ipcRenderer.send('restart-app'),
   closeApp: () => ipcRenderer.send('close-app'),
   
+  // Versi aplikasi yang sedang berjalan
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+
   // Auto Updater
   checkUpdate: () => ipcRenderer.invoke('check-update'),
   downloadUpdate: () => ipcRenderer.send('download-update'),
@@ -40,6 +43,14 @@ contextBridge.exposeInMainWorld('camera', {
   startLiveView: () => ipcRenderer.invoke('camera:startLiveView'),
   stopLiveView: () => ipcRenderer.invoke('camera:stopLiveView'),
   capture: () => ipcRenderer.invoke('camera:capture'),
+
+  // Alur jepret terpisah: arm saat countdown mulai, fire tepat di akhir
+  // countdown, collect setelahnya.
+  armCapture: () => ipcRenderer.invoke('camera:armCapture'),
+  fireShutter: () => ipcRenderer.invoke('camera:fireShutter'),
+  collectPhoto: () => ipcRenderer.invoke('camera:collectPhoto'),
+  getShutterCommand: () => ipcRenderer.invoke('camera:getShutterCommand'),
+  setShutterCommand: (value) => ipcRenderer.invoke('camera:setShutterCommand', value),
   getFrame: () => ipcRenderer.invoke('camera:getFrame'),
   getLastCaptured: () => ipcRenderer.invoke('camera:getLastCaptured'),
   downloadPhoto: (filename) => ipcRenderer.invoke('camera:downloadPhoto', filename),

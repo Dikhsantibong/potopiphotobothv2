@@ -105,6 +105,11 @@ ipcMain.on('close-app', () => {
   app.quit();
 });
 
+ipcMain.handle('get-app-version', () => ({
+  version: app.getVersion(),
+  packaged: app.isPackaged,
+}));
+
 // ── Auto Updater Handlers ─────────────────────────────────
 ipcMain.handle('check-update', async () => {
   if (dev) {

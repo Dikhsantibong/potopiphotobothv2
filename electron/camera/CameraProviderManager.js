@@ -41,6 +41,7 @@ class CameraProviderManager {
         baseUrl: config.readDigiCamUrl(),
         sessionDir: this.currentSessionDir || this.sessionRoot,
         imageQuality: config.readDigiCamQuality(),
+        shutterCommand: config.readDigiCamShutter(),
       });
     }
     return new WebcamProviderService({ bridge: this.bridge });
@@ -274,6 +275,53 @@ class CameraProviderManager {
     } catch (err) {
       return { ok: false, provider: this.activeName, error: err.message };
     }
+  }
+
+  /** Persiapan sebelum momen jepret (dipanggil saat countdown mulai). */
+  async armCapture() {
+    if (!this.provider) return { ok: false, error: 'Provider belum diinisialisasi' };
+    if (typeof this.provider.armCapture !== 'function') return { ok: true, skipped: true };
+    try {
+      return await this.provider.armCapture();
+    } catch (err) {
+      return { ok: false, provider: this.activeName, error: err.message };
+    }
+  }
+
+  /** Momen jepret — harus secepat mungkin. */
+  async fireShutter() {
+    if (!this.provider) return { ok: false, error: 'Provider belum diinisialisasi' };
+    if (typeof this.provider.fireShutter !== 'function') {
+      return { ok: false, code: 'RENDERER_OWNED', provider: this.activeName };
+    }
+    try {
+      return await this.provider.fireShutter();
+    } catch (err) {
+      return { ok: false, provider: this.activeName, error: err.message };
+    }
+  }
+
+  /** Ambil file hasil jepretan setelah shutter jatuh. */
+  async collectPhoto() {
+    if (!this.provider) return { ok: false, error: 'Provider belum diinisialisasi' };
+    if (typeof this.provider.collectPhoto !== 'function') {
+      return { ok: false, code: 'RENDERER_OWNED', provider: this.activeName };
+    }
+    try {
+      return await this.provider.collectPhoto({ sessionDir: this.currentSessionDir || this.sessionRoot });
+    } catch (err) {
+      return { ok: false, provider: this.activeName, error: err.message };
+    }
+  }
+
+  getShutterCommand() {
+    return config.readDigiCamShutter();
+  }
+
+  setShutterCommand(value) {
+    const stored = config.writeDigiCamShutter(value);
+    if (this.provider) this.provider.shutterCommand = stored;
+    return { ok: true, value: stored };
   }
 
   async getLastCaptured() {
