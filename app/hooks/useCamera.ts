@@ -240,6 +240,11 @@ export function useCamera(options: UseCameraOptions = {}) {
     }
 
     setLiveViewState("starting");
+    setLiveViewUrl(null);
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
     const res = await bridge.startLiveView();
     if (!res?.ok) {
       setLiveViewState("error");
@@ -300,15 +305,20 @@ export function useCamera(options: UseCameraOptions = {}) {
     }
   }, []);
 
-  /** Momen jepret. Sengaja tidak menyentuh state agar tidak menunda apa pun. */
+  /** Momen jepret. Sengaja tidak menyentuh state agar tidak menunda apa pun?
+   *  Tidak, kita set isCapturing agar live view benar-benar pause.
+   */
   const fireShutter = useCallback(async () => {
     const bridge = getCameraBridge();
     if (!bridge?.fireShutter) return { ok: false, error: "Bridge kamera tidak tersedia" };
+    setIsCapturing(true);
     stopFrameLoop();
     try {
       return await bridge.fireShutter();
     } catch (e) {
       return { ok: false, error: (e as Error).message };
+    } finally {
+      setIsCapturing(false);
     }
   }, [stopFrameLoop]);
 
@@ -316,7 +326,8 @@ export function useCamera(options: UseCameraOptions = {}) {
   const collectPhoto = useCallback(async () => {
     const bridge = getCameraBridge();
     if (!bridge?.collectPhoto) return { ok: false, error: "Bridge kamera tidak tersedia" };
-    setIsCapturing(true);
+    // Tidak mengatur isCapturing=true di sini karena collectPhoto berjalan
+    // paralel di latar belakang. Jika diset true, live view tidak bisa jalan!
     setError(null);
     try {
       const res = await bridge.collectPhoto();
@@ -326,8 +337,6 @@ export function useCamera(options: UseCameraOptions = {}) {
       const message = (e as Error).message;
       setError(message);
       return { ok: false, error: message };
-    } finally {
-      setIsCapturing(false);
     }
   }, []);
 

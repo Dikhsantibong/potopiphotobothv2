@@ -242,13 +242,7 @@ function PrintContent() {
     const loadData = async () => {
       const img = localStorage.getItem("finalRenderImage");
       const pricingRaw = localStorage.getItem("paymentGateway");
-      setFinalImage(img);
       if (pricingRaw) setPricing(JSON.parse(pricingRaw));
-
-      const videoBlob = await localforage.getItem<Blob>("finalLiveVideo");
-      if (videoBlob) {
-        setFinalVideoUrl(URL.createObjectURL(videoBlob));
-      }
 
       const raw = localStorage.getItem("capturedPhotos") || localStorage.getItem("rawPhotos");
       if (raw) {
@@ -263,6 +257,11 @@ function PrintContent() {
         }
       }
 
+      const videoBlob = await localforage.getItem<Blob>("finalLiveVideo");
+      if (videoBlob) {
+        setFinalVideoUrl(URL.createObjectURL(videoBlob));
+      }
+
       // Read template category
       const templatesRaw = localStorage.getItem(`templates_${canvasType}`);
       if (templatesRaw) {
@@ -272,6 +271,10 @@ function PrintContent() {
           if (tpl?.category) setTemplateCategory(tpl.category);
         } catch (e) { /* ignore */ }
       }
+      
+      // SET FINAL IMAGE TERAKHIR, untuk memicu `performUpload`
+      // setelah `gifPromiseRef.current` pasti sudah terisi.
+      setFinalImage(img);
     };
     loadData();
     localStorage.removeItem("session_expiry");

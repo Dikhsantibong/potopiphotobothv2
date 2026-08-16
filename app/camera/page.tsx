@@ -1127,6 +1127,12 @@ function CameraContent() {
 
     setShowPreview(false);
 
+    if (!usesWebcam) {
+
+      startLiveView().catch(() => {});
+
+    }
+
 
 
     // Cek apakah ini frame terakhir menggunakan foto yang sudah berisi preview sementara
@@ -1246,6 +1252,12 @@ function CameraContent() {
     setVideos((prev) => { const u = [...prev]; u[currentFrame] = null; return u; });
 
     setShowPreview(false);
+
+    if (!usesWebcam) {
+
+      startLiveView().catch(() => {});
+
+    }
 
   };
 

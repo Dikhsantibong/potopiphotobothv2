@@ -72,12 +72,12 @@ export async function POST(req: Request) {
     const outputPath = path.join(workDir, "out.gif")
     const framerate = (1000 / delayMs).toFixed(4)
 
-    // palettegen/paletteuse dalam satu pass: GIF 256 warna tanpa banding parah.
+    // palettegen/paletteuse dalam satu pass: GIF 256 warna dengan dithering halus.
     const args = [
       "-y",
       "-framerate", framerate,
       "-i", path.join(workDir, "frame_%03d.jpg"),
-      "-vf", `scale=${width}:-2:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=128:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3`,
+      "-vf", `scale=${width}:-2:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=256[p];[s1][p]paletteuse=dither=sierra2_4a`,
       "-loop", "0",
       outputPath
     ]
