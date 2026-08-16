@@ -18,7 +18,9 @@
     "dist": "npm run build && electron-builder",
     "test:digicam": "node scripts/test-digicam.mjs",
     "test:camera-config": "node scripts/test-camera-config.mjs",
-    "test:exif": "node scripts/test-exif.mjs"
+    "test:exif": "node scripts/test-exif.mjs",
+    "version:sync": "node scripts/sync-lock-version.mjs",
+    "release": "npm version patch --no-git-tag-version && npm run version:sync"
   },
   "dependencies": {
     "@ffmpeg/core": "^0.12.6",

@@ -51,24 +51,28 @@ jobs:
             echo "Release ${{ steps.ver.outputs.tag }} belum ada -> lanjut build."
           fi
 
-      - name: Pastikan versi package.json dan package-lock.json sama
-        if: steps.check.outputs.exists == 'false'
-        shell: bash
-        run: |
-          PKG=$(node -p "require('./package.json').version")
-          LOCK=$(node -p "require('./package-lock.json').version")
-          if [ "$PKG" != "$LOCK" ]; then
-            echo "::error title=Versi tidak sinkron::package.json=$PKG tetapi package-lock.json=$LOCK. Jalankan 'npm install --package-lock-only' lalu commit ulang."
-            exit 1
-          fi
-          echo "Versi sinkron: $PKG"
-
       - name: Install Node.js
         if: steps.check.outputs.exists == 'false'
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
+
+      # Field "version" di package-lock.json tidak memengaruhi npm ci, jadi
+      # ketidaksinkronan di sini tidak boleh memblokir rilis. Cukup rapikan di
+      # runner (tidak di-commit) dan beri peringatan.
+      - name: Samakan versi package-lock.json
+        if: steps.check.outputs.exists == 'false'
+        shell: bash
+        run: |
+          PKG=$(node -p "require('./package.json').version")
+          LOCK=$(node -p "require('./package-lock.json').version")
+          if [ "$PKG" != "$LOCK" ]; then
+            echo "::warning title=Versi lock tidak sinkron::package.json=$PKG tetapi package-lock.json=$LOCK. Diperbaiki otomatis untuk build ini; jalankan 'npm run version:sync' lalu commit agar repo ikut rapi."
+            node scripts/sync-lock-version.mjs
+          else
+            echo "Versi sinkron: $PKG"
+          fi
 
       - name: Install Dependencies
         if: steps.check.outputs.exists == 'false'
