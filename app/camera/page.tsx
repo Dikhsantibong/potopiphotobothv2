@@ -399,6 +399,10 @@ function CameraContent() {
 
     stopLiveView,
 
+    pauseFrames,
+
+    resumeFrames,
+
     capture: providerCapture,
 
     isCapturing,
@@ -464,6 +468,24 @@ function CameraContent() {
     };
 
   }, [providerReady, usesWebcam, startLiveView, stopLiveView]);
+
+
+
+  // Frame live view hanya di-poll saat benar-benar terlihat. Saat preview foto
+
+  // tampil atau capture sedang berjalan, polling dihentikan supaya web server
+
+  // digiCamControl tidak ikut melambat.
+
+  useEffect(() => {
+
+    if (usesWebcam || !cameraReady) return;
+
+    if (showPreview || isCapturing) pauseFrames();
+
+    else resumeFrames();
+
+  }, [usesWebcam, cameraReady, showPreview, isCapturing, pauseFrames, resumeFrames]);
 
 
 
@@ -558,6 +580,18 @@ function CameraContent() {
   // hasil akhirnya identik untuk template, print, dan upload.
 
   const [captureError, setCaptureError] = useState<string | null>(null);
+
+
+
+  useEffect(() => {
+
+    if (!captureError) return;
+
+    const t = setTimeout(() => setCaptureError(null), 6000);
+
+    return () => clearTimeout(t);
+
+  }, [captureError]);
 
 
 
@@ -1018,8 +1052,10 @@ function CameraContent() {
                 </div>
               )}
 
-              {/* Error kamera (timeout / provider tidak terhubung) */}
-              {(captureError || (!usesWebcam && cameraError)) && (
+              {/* Error kamera (timeout / provider tidak terhubung).
+                  Disembunyikan selama percobaan baru berjalan agar pesan lama
+                  tidak menumpuk di atas overlay "Mengambil foto...". */}
+              {!isCapturing && (captureError || (!usesWebcam && cameraError)) && (
                 <div className="absolute top-4 left-4 right-24 z-40 bg-rose-600/95 text-white px-4 py-2 rounded-xl shadow-lg">
                   <p className="text-[10px] font-black uppercase tracking-widest leading-relaxed">
                     {captureError || cameraError}
@@ -1066,7 +1102,7 @@ function CameraContent() {
 
                   <button
 
-                    onClick={() => { if (cameraReady && countdown === null && !isCapturing) setCountdown(3); }}
+                    onClick={() => { if (cameraReady && countdown === null && !isCapturing) { setCaptureError(null); setCountdown(3); } }}
 
                     className="w-20 h-20 rounded-full bg-white/90 backdrop-blur-md border-[6px] border-[#f15a09] flex items-center justify-center text-[#f15a09] shadow-2xl hover:scale-110 active:scale-95 transition-all group"
 

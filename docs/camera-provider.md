@@ -47,6 +47,27 @@ di-set eksplisit ke digiCamControl lewat `session.folder` saat sesi dimulai.
 3. Tutup EOS Webcam Utility — dua aplikasi tidak bisa memegang device USB yang sama.
 4. Verifikasi: `npm run test:digicam`
 
+## Kenapa capture bisa terasa lambat
+
+Empat sumber latensi, semuanya sudah ditangani:
+
+| Sumber | Penanganan |
+|---|---|
+| Foto 24 MP (~7 MB) dikirim utuh ke renderer lalu digambar ke canvas 6000×4000 | Diperkecil ke lebar 1920 px pakai `nativeImage` di Main Process; file resolusi penuh tetap tersimpan di folder sesi |
+| Polling `/liveview.jpg` 12 fps terus jalan selama capture | Frame loop dihentikan saat capture berjalan dan saat preview foto tampil; antrean request lama di-abort sebelum shutter |
+| `healthCheck()` ekstra sebelum setiap capture | Dihapus — live view yang aktif sudah membuktikan web server hidup |
+| Live view mati sendiri setelah shutter | `LiveViewWnd_Show` dikirim ulang tanpa menunggu, jadi frame berikutnya sudah siap |
+
+Waktu capture dicatat di log Main Process:
+`[Camera] Capture selesai dalam 2840ms (7.1 MB → 412 KB)`
+
+Kalau muncul **"Kamera tidak merespon, coba lagi"**: `lastcaptured` tidak berubah
+dalam 12 detik. Penyebab paling umum adalah kamera gagal fokus, atau digiCamControl
+diatur menyimpan foto hanya ke SD card sehingga file tidak pernah sampai ke PC.
+Sebagai jaring pengaman, sekali timeout aplikasi mencoba `/preview.jpg` dan hanya
+menerimanya bila isinya berbeda dari foto terakhir — jadi tidak pernah menghasilkan
+frame duplikat.
+
 ## Batasan yang disengaja
 
 - **Kanvas Flipbook selalu memakai Webcam Utility.** Flipbook merekam video lewat

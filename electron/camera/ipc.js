@@ -8,6 +8,38 @@ const path = require('path');
 const { CameraProviderManager } = require('./CameraProviderManager');
 
 /**
+ * Lebar maksimum foto yang dikirim ke renderer.
+ *
+ * Canon EOS 200D menghasilkan JPEG 24 MP (~6–8 MB). Dikirim apa adanya, foto itu
+ * membengkak +33% jadi base64, lalu renderer harus men-decode dan menggambarnya
+ * ke canvas 6000×4000 sebelum toDataURL — beberapa detik hanya untuk satu frame.
+ * 1920 px setara dengan yang dihasilkan jalur webcam existing, jadi kualitas
+ * cetak tidak turun dibanding sebelum migrasi. File resolusi penuh tetap
+ * tersimpan di folder sesi.
+ */
+const MAX_CAPTURE_WIDTH = 1920;
+const CAPTURE_JPEG_QUALITY = 92;
+
+function toDisplayJpeg(buffer) {
+  try {
+    const { nativeImage } = require('electron');
+    let image = nativeImage.createFromBuffer(buffer);
+    if (image.isEmpty()) return buffer;
+
+    const size = image.getSize();
+    if (size.width > MAX_CAPTURE_WIDTH) {
+      image = image.resize({ width: MAX_CAPTURE_WIDTH, quality: 'good' });
+    }
+
+    const jpeg = image.toJPEG(CAPTURE_JPEG_QUALITY);
+    if (jpeg && jpeg.length > 1024) return jpeg;
+  } catch (err) {
+    console.warn('[Camera] Resize foto gagal, memakai ukuran asli:', err.message);
+  }
+  return buffer;
+}
+
+/**
  * Jembatan request/response Main → Renderer, dipakai WebcamProviderService
  * untuk menyuruh renderer menghentikan MediaStream-nya.
  */
@@ -62,7 +94,19 @@ function registerCameraIpc({ ipcMain, getWindow, sessionRoot }) {
   ipcMain.handle('camera:getStatus', () => manager.getStatus());
   ipcMain.handle('camera:startLiveView', () => manager.startLiveView());
   ipcMain.handle('camera:stopLiveView', () => manager.stopLiveView());
-  ipcMain.handle('camera:capture', () => manager.capture());
+  ipcMain.handle('camera:capture', async () => {
+    const started = Date.now();
+    const res = await manager.capture();
+    if (!res || !res.ok || !res.buffer) return res;
+
+    const { buffer, ...rest } = res;
+    const jpeg = toDisplayJpeg(buffer);
+    console.log(
+      `[Camera] Capture selesai dalam ${Date.now() - started}ms ` +
+      `(${(buffer.length / 1024 / 1024).toFixed(1)} MB → ${(jpeg.length / 1024).toFixed(0)} KB)`
+    );
+    return { ...rest, dataUrl: `data:image/jpeg;base64,${jpeg.toString('base64')}` };
+  });
   ipcMain.handle('camera:getLastCaptured', () => manager.getLastCaptured());
   ipcMain.handle('camera:downloadPhoto', (_e, filename) => manager.downloadPhoto(filename));
   ipcMain.handle('camera:getProvider', () => manager.getProvider());

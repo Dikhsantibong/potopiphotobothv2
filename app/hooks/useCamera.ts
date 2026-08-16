@@ -83,6 +83,8 @@ export function useCamera(options: UseCameraOptions = {}) {
     cancelled: false,
     timer: null,
   });
+  /** Live view sudah pernah dimulai — syarat sebelum frame loop boleh di-resume. */
+  const liveViewStartedRef = useRef(false);
 
   const setFrame = useCallback((bytes: Uint8Array, mime: string) => {
     const blob = new Blob([new Uint8Array(bytes)], { type: mime || "image/jpeg" });
@@ -240,12 +242,30 @@ export function useCamera(options: UseCameraOptions = {}) {
     }
     setConnected(true);
     setError(null);
+    liveViewStartedRef.current = true;
     startFrameLoop();
     return res;
   }, [activeProvider, startFrameLoop]);
 
+  /**
+   * Hentikan sementara polling frame tanpa mematikan live view di kamera.
+   * Dipakai saat capture berjalan dan saat preview foto ditampilkan — web server
+   * digiCamControl melayani request secara berurutan, jadi membanjirinya dengan
+   * /liveview.jpg membuat Capture dan download foto ikut melambat.
+   */
+  const pauseFrames = useCallback(() => {
+    stopFrameLoop();
+  }, [stopFrameLoop]);
+
+  const resumeFrames = useCallback(() => {
+    if (!liveViewStartedRef.current) return;
+    if (pollingRef.current && !pollingRef.current.cancelled && pollingRef.current.timer) return;
+    startFrameLoop();
+  }, [startFrameLoop]);
+
   const stopLiveView = useCallback(async () => {
     stopFrameLoop();
+    liveViewStartedRef.current = false;
     setLiveViewState("idle");
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
@@ -262,6 +282,11 @@ export function useCamera(options: UseCameraOptions = {}) {
     const bridge = getCameraBridge();
     if (!bridge) return { ok: false, error: "Bridge kamera tidak tersedia" };
     setIsCapturing(true);
+    // Error dari percobaan sebelumnya tidak boleh menempel di layar saat
+    // percobaan baru sedang berjalan.
+    setError(null);
+    // Bebaskan web server digiCamControl selama shutter + transfer file.
+    stopFrameLoop();
     try {
       const res = await bridge.capture();
       if (!res?.ok) setError(res?.error || "Capture gagal");
@@ -273,7 +298,7 @@ export function useCamera(options: UseCameraOptions = {}) {
     } finally {
       setIsCapturing(false);
     }
-  }, []);
+  }, [stopFrameLoop]);
 
   // Auto start / cleanup live view untuk provider non-webcam
   useEffect(() => {
@@ -309,6 +334,8 @@ export function useCamera(options: UseCameraOptions = {}) {
     error,
     startLiveView,
     stopLiveView,
+    pauseFrames,
+    resumeFrames,
     capture,
     /** true bila halaman harus memakai flow getUserMedia existing */
     usesWebcam: activeProvider === "webcam",
