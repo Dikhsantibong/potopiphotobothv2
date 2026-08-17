@@ -657,9 +657,9 @@ function CameraContent() {
 
   // Dinaikkan setiap kali sesi frame berubah (capture baru / ULANGI), supaya
 
-  // hasil unduhan yang terlambat tidak menimpa frame yang sudah tidak relevan.
+  // hasil unduhan yang terlambat tidak menimpa frame yang khusus di-retake.
 
-  const captureGenRef = useRef(0);
+  const captureGenRef = useRef<Record<number, number>>({});
 
 
 
@@ -1001,7 +1001,13 @@ function CameraContent() {
 
     const frameIndex = currentFrameRef.current;
 
-    const generation = ++captureGenRef.current;
+    if (captureGenRef.current[frameIndex] === undefined) {
+
+      captureGenRef.current[frameIndex] = 0;
+
+    }
+
+    const generation = ++captureGenRef.current[frameIndex];
 
 
 
@@ -1041,15 +1047,11 @@ function CameraContent() {
 
     if (provisional) {
 
-      setPhotos((prev) => {
+      photosRef.current = [...photosRef.current];
 
-        const u = [...prev];
+      photosRef.current[frameIndex] = provisional;
 
-        u[frameIndex] = provisional;
-
-        return u;
-
-      });
+      setPhotos(photosRef.current);
 
       setShowPreview(true);
 
@@ -1069,7 +1071,7 @@ function CameraContent() {
 
       // Frame ini sudah di-retake atau diganti capture lain — abaikan hasilnya.
 
-      if (captureGenRef.current !== generation) return;
+      if (captureGenRef.current[frameIndex] !== generation) return;
 
 
 
@@ -1099,17 +1101,21 @@ function CameraContent() {
 
         const processed = isMirrored ? await processProviderJpeg(res.dataUrl) : res.dataUrl;
 
-        if (captureGenRef.current !== generation) return;
+        if (captureGenRef.current[frameIndex] !== generation) return;
 
-        setPhotos((prev) => {
 
-          const u = [...prev];
 
-          u[frameIndex] = processed;
+        // Update ref sinkron agar handleNext bisa langsung membacanya
 
-          return u;
+        // setelah await task ini selesai, sebelum React melakukan render ulang.
 
-        });
+        photosRef.current = [...photosRef.current];
+
+        photosRef.current[frameIndex] = processed;
+
+        setPhotos(photosRef.current);
+
+
 
         if (!provisional) setShowPreview(true);
 
@@ -1127,7 +1133,11 @@ function CameraContent() {
 
     void task.finally(() => {
 
-      pendingCapturesRef.current.delete(frameIndex);
+      if (pendingCapturesRef.current.get(frameIndex) === task) {
+
+        pendingCapturesRef.current.delete(frameIndex);
+
+      }
 
     });
 
@@ -1149,12 +1159,6 @@ function CameraContent() {
 
     setShowPreview(false);
 
-    if (!usesWebcam) {
-
-      startLiveView().catch(() => {});
-
-    }
-
 
 
     // Cek apakah ini frame terakhir menggunakan foto yang sudah berisi preview sementara
@@ -1162,6 +1166,14 @@ function CameraContent() {
     const currentPhotos = photosRef.current;
 
     const allDone = currentPhotos.every((p) => p !== null);
+
+
+
+    if (!usesWebcam && !allDone) {
+
+      startLiveView().catch(() => {});
+
+    }
 
 
 
@@ -1261,7 +1273,11 @@ function CameraContent() {
 
     // frame yang baru saja dikosongkan.
 
-    captureGenRef.current++;
+    if (captureGenRef.current[currentFrame] !== undefined) {
+
+      captureGenRef.current[currentFrame]++;
+
+    }
 
     pendingCapturesRef.current.delete(currentFrame);
 
@@ -1269,7 +1285,11 @@ function CameraContent() {
 
     setCaptureError(null);
 
-    setPhotos((prev) => { const u = [...prev]; u[currentFrame] = null; return u; });
+    photosRef.current = [...photosRef.current];
+
+    photosRef.current[currentFrame] = null;
+
+    setPhotos(photosRef.current);
 
     setVideos((prev) => { const u = [...prev]; u[currentFrame] = null; return u; });
 
