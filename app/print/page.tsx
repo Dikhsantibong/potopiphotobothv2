@@ -217,14 +217,14 @@ function PrintContent() {
         formData.append("frames", dataUrlToBlob(photo), `frame_${index}.jpg`);
       });
       formData.append("delayMs", "500");
-      formData.append("width", "480");
+      formData.append("width", "800");
 
       const res = await fetch("/api/make-gif", { method: "POST", body: formData });
       if (!res.ok || res.headers.get("X-Gif-Success") !== "true") {
         throw new Error(`GIF gagal dibuat (HTTP ${res.status})`);
       }
 
-      const gif = new Blob([await res.arrayBuffer()], { type: "image/gif" });
+      const gif = new Blob([await res.arrayBuffer()], { type: "video/mp4" });
       setGifUrl(URL.createObjectURL(gif));
       setGifState("ready");
       await localforage.setItem("finalGif", gif);
@@ -375,14 +375,11 @@ function PrintContent() {
           }
         });
 
-        // ── Tambahkan GIF ──
-        // Tunggu proses ffmpeg, tapi jangan sampai menggantung upload.
-        const gifBlob = await Promise.race([
-          gifPromiseRef.current ?? Promise.resolve(null),
-          new Promise<null>((r) => setTimeout(() => r(null), 15000)),
-        ]);
+        // ── Tambahkan GIF / MP4 Slideshow ──
+        // Tunggu proses ffmpeg secara utuh untuk menjamin video pasti masuk, apapun keadaannya!
+        const gifBlob = await (gifPromiseRef.current ?? Promise.resolve(null));
         if (gifBlob) {
-          formData.append("gif", gifBlob, "final.gif");
+          formData.append("gif", gifBlob, "final.mp4");
         } else {
           console.warn("[Print] GIF belum siap saat upload — dilewati");
         }
@@ -424,6 +421,10 @@ function PrintContent() {
           const xhr = new XMLHttpRequest();
           activeXhrRef.current = xhr;
           xhr.open("POST", "/api/final-images");
+          
+          xhr.timeout = 25000; // Timeout 25 detik
+          xhr.ontimeout = () => reject(new Error("Upload timeout (25s)"));
+
           xhr.upload.onprogress = (e) => {
             if (e.lengthComputable) {
               setUploadProgress(Math.round((e.loaded / e.total) * 100));
@@ -493,6 +494,8 @@ function PrintContent() {
       });
 
       const finalVideoBlob = await localforage.getItem<Blob>("finalLiveVideo");
+      // Wajib tunggu perakit selesai, karena jika di-skip, offline queue akan kehilangan MP4-nya!
+      await (gifPromiseRef.current ?? Promise.resolve(null));
       const finalGifBlob = await localforage.getItem<Blob>("finalGif");
 
       const queueId = "offline_upload_" + Date.now() + "_" + Math.floor(Math.random()*1000);
@@ -793,7 +796,7 @@ function PrintContent() {
                  {previewMode === "photo" ? (
                     <img src={finalImage} alt="Final" className="h-full object-contain select-none animate-in fade-in duration-500" />
                  ) : previewMode === "gif" && gifUrl ? (
-                    <img src={gifUrl} alt="GIF" className="h-full object-contain select-none animate-in fade-in duration-500" />
+                    <video src={gifUrl} autoPlay loop muted playsInline className="h-full object-contain select-none animate-in fade-in duration-500" />
                  ) : previewMode === "gif" && rawPhotos.length > 0 ? (
                     // Fallback selama ffmpeg masih merakit GIF: slideshow foto frame
                     <div className="relative h-full flex items-center justify-center">
@@ -864,10 +867,20 @@ function PrintContent() {
                 {uploadStage !== "success" && (
                    <div className="absolute inset-0 bg-[#f15a09]/80 backdrop-blur-sm rounded-[3rem] flex items-center justify-center flex-col p-6">
                       {uploadStage === "error" ? (
-                        <>
-                          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="mb-3"><circle cx="12" cy="12" r="10"/><line x1="15" x2="9" y1="9" y2="15"/><line x1="9" x2="15" y1="9" y2="15"/></svg>
-                          <span className="text-white text-[10px] font-black uppercase tracking-widest">UPLOAD GAGAL</span>
-                        </>
+                        <div className="flex flex-col items-center text-center w-full">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="mb-3 drop-shadow-md animate-pulse">
+                             <circle cx="12" cy="12" r="10"></circle>
+                             <polyline points="12 6 12 12 16 14"></polyline>
+                          </svg>
+                          <span className="text-white text-xs font-black uppercase tracking-widest leading-snug drop-shadow-md">
+                             UPLOAD VIA<br/>LATAR BELAKANG
+                          </span>
+                          <div className="mt-3 bg-black/25 backdrop-blur-sm px-3 py-2 rounded-xl border border-white/20 shadow-inner w-full max-w-[90%] mx-auto">
+                             <span className="text-white text-[9px] font-bold tracking-wider leading-relaxed block">
+                                Silakan hubungi staf untuk meminta file Anda
+                             </span>
+                          </div>
+                        </div>
                       ) : (
                         <>
                           <div className="relative w-16 h-16 mb-3">

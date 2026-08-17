@@ -69,19 +69,19 @@ export async function POST(req: Request) {
       fs.writeFileSync(path.join(workDir, `frame_${String(i + 1).padStart(3, "0")}.jpg`), buffer)
     }
 
-    const outputPath = path.join(workDir, "out.gif")
+    const outputPath = path.join(workDir, "out.mp4")
     const framerate = (1000 / delayMs).toFixed(4)
 
-      // stats_mode=single & new=1 menghasilkan palet 256 warna KHUSUS untuk setiap frame secara terpisah.
-      // dither=none menghilangkan efek titik-titik (retro noise/sandy effect) sama sekali.
-      const args = [
-        "-y",
-        "-framerate", framerate,
-        "-i", path.join(workDir, "frame_%03d.jpg"),
-        "-vf", `scale=${width}:-2:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=single[p];[s1][p]paletteuse=new=1:dither=none`,
-        "-loop", "0",
-        outputPath
-      ]
+    // Gunakan libx264 untuk menghasilkan MP4 yang bersih (jutaan warna) tanpa noise dithering.
+    const args = [
+      "-y",
+      "-framerate", framerate,
+      "-i", path.join(workDir, "frame_%03d.jpg"),
+      "-c:v", "libx264",
+      "-pix_fmt", "yuv420p",
+      "-vf", `scale=${width}:-2`,
+      outputPath
+    ]
 
     console.log(`[make-gif] ${frames.length} frame, delay ${delayMs}ms, lebar ${width}px`)
     await execFileAsync(absoluteFfmpegPath, args, { timeout: 60000, maxBuffer: 10 * 1024 * 1024 })
@@ -94,7 +94,7 @@ export async function POST(req: Request) {
     return new Response(new Uint8Array(gifBuffer), {
       status: 200,
       headers: {
-        "Content-Type": "image/gif",
+        "Content-Type": "video/mp4",
         "Content-Length": gifBuffer.length.toString(),
         "X-Gif-Success": "true",
       }
