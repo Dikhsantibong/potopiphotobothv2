@@ -376,12 +376,13 @@ function PrintContent() {
         });
 
         // ── Tambahkan GIF / MP4 Slideshow ──
-        // Tunggu proses ffmpeg secara utuh untuk menjamin video pasti masuk, apapun keadaannya!
+        // Tunggu proses ffmpeg secara utuh untuk menjamin video pasti masuk.
         const gifBlob = await (gifPromiseRef.current ?? Promise.resolve(null));
         if (gifBlob) {
+          // Kirim ke slot "gif" karena roambooth backend mengharapkan file ini di kolom gif_path
           formData.append("gif", gifBlob, "final.mp4");
         } else {
-          console.warn("[Print] GIF belum siap saat upload — dilewati");
+          console.warn("[Print] GIF gagal dibuat — dilewati");
         }
 
         if (abortController.signal.aborted) throw new Error("Aborted beforehand");
@@ -421,10 +422,6 @@ function PrintContent() {
           const xhr = new XMLHttpRequest();
           activeXhrRef.current = xhr;
           xhr.open("POST", "/api/final-images");
-          
-          xhr.timeout = 25000; // Timeout 25 detik
-          xhr.ontimeout = () => reject(new Error("Upload timeout (25s)"));
-
           xhr.upload.onprogress = (e) => {
             if (e.lengthComputable) {
               setUploadProgress(Math.round((e.loaded / e.total) * 100));
@@ -494,7 +491,7 @@ function PrintContent() {
       });
 
       const finalVideoBlob = await localforage.getItem<Blob>("finalLiveVideo");
-      // Wajib tunggu perakit selesai, karena jika di-skip, offline queue akan kehilangan MP4-nya!
+      // Tunggu perakit GIF agar tidak hilang jika koneksi error
       await (gifPromiseRef.current ?? Promise.resolve(null));
       const finalGifBlob = await localforage.getItem<Blob>("finalGif");
 
@@ -873,11 +870,11 @@ function PrintContent() {
                              <polyline points="12 6 12 12 16 14"></polyline>
                           </svg>
                           <span className="text-white text-xs font-black uppercase tracking-widest leading-snug drop-shadow-md">
-                             UPLOAD VIA<br/>LATAR BELAKANG
+                             PROSES UPLOAD FILE<br/>TERKENDALA JARINGAN
                           </span>
                           <div className="mt-3 bg-black/25 backdrop-blur-sm px-3 py-2 rounded-xl border border-white/20 shadow-inner w-full max-w-[90%] mx-auto">
                              <span className="text-white text-[9px] font-bold tracking-wider leading-relaxed block">
-                                Silakan hubungi staf untuk meminta file Anda
+                                Hubungi staf untuk ambil file Anda
                              </span>
                           </div>
                         </div>

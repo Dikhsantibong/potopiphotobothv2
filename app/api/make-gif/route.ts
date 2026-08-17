@@ -75,11 +75,13 @@ export async function POST(req: Request) {
     // Gunakan libx264 untuk menghasilkan MP4 yang bersih (jutaan warna) tanpa noise dithering.
     const args = [
       "-y",
+      "-loop", "1", // Loop urutan gambar secara terus-menerus
       "-framerate", framerate,
       "-i", path.join(workDir, "frame_%03d.jpg"),
       "-c:v", "libx264",
       "-pix_fmt", "yuv420p",
       "-vf", `scale=${width}:-2`,
+      "-t", "10", // Potong tepat di durasi 10 detik
       outputPath
     ]
 
