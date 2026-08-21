@@ -1,6 +1,6 @@
 {
   "name": "potopi-photobooth",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "private": true,
   "main": "main.js",
   "author": "CtechAgency",
@@ -20,9 +20,10 @@
     "test:camera-config": "node scripts/test-camera-config.mjs",
     "test:exif": "node scripts/test-exif.mjs",
     "version:sync": "node scripts/sync-lock-version.mjs",
-    "release": "npm version patch --no-git-tag-version && npm run version:sync"
+    "release": "npm version patch --no-git-tag-version && npm run version:sync",
+    "test:shutter": "node scripts/test-shutter.mjs"
   },
-  "dependencies": { 
+  "dependencies": {
     "@ffmpeg/core": "^0.12.6",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
@@ -52,12 +53,14 @@
     "wait-on": "^9.0.4"
   },
   "build": {
-    "publish": [{
-      "provider": "github",
-      "owner": "Dikhsantibong",
-      "repo": "potopiphotobothv2",
-      "releaseType": "release"
-    }],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Dikhsantibong",
+        "repo": "potopiphotobothv2",
+        "releaseType": "release"
+      }
+    ],
     "compression": "store",
     "appId": "com.roambooth.machine1",
     "productName": "RoamBooth Machine",

@@ -18,6 +18,7 @@
  * Tidak ada asumsi endpoint MJPEG di port lain.
  */
 const fs = require('fs');
+const http = require('http');
 const path = require('path');
 const { ICameraProvider } = require('./ICameraProvider');
 
@@ -49,6 +50,13 @@ class DigiCamControlService extends ICameraProvider {
     this.disposed = false;
     /** @type {Set<AbortController>} semua request HTTP yang masih menggantung */
     this.pending = new Set();
+    /**
+     * Subset dari `pending` yang khusus berisi request frame live view.
+     * Dipisahkan supaya membersihkan antrean live view tidak ikut membatalkan
+     * unduhan foto yang sedang berjalan di latar belakang.
+     * @type {Set<AbortController>}
+     */
+    this.frameControllers = new Set();
     /** Sidik jari foto terakhir, dipakai fallback agar tidak mengambil foto duplikat. */
     this.lastCaptureSignature = null;
   }
@@ -58,10 +66,11 @@ class DigiCamControlService extends ICameraProvider {
   }
 
   // ── HTTP helpers ────────────────────────────────────────────
-  async _fetch(suffix, { timeout = 4000, raw = false } = {}) {
+  async _fetch(suffix, { timeout = 4000, raw = false, kind = 'data' } = {}) {
     if (this.disposed) throw new Error('Provider digiCamControl sudah dihentikan');
     const controller = new AbortController();
     this.pending.add(controller);
+    if (kind === 'frame') this.frameControllers.add(controller);
     const timer = setTimeout(() => controller.abort(), timeout);
     try {
       const res = await fetch(this.baseUrl + suffix, { signal: controller.signal });
@@ -73,11 +82,57 @@ class DigiCamControlService extends ICameraProvider {
     } finally {
       clearTimeout(timer);
       this.pending.delete(controller);
+      this.frameControllers.delete(controller);
     }
   }
 
+  /**
+   * GET dengan koneksi sendiri (agent: false, Connection: close).
+   *
+   * Perintah CMD TIDAK boleh ikut memakai connection pool milik global fetch.
+   * Pool itu dipakai bersama request frame live view, dan membatalkan salah satu
+   * request bisa merusak socket yang sedang dipakai — request berikutnya lalu
+   * gagal dengan "fetch failed" (ECONNRESET) meski digiCamControl sehat.
+   */
+  _httpGet(suffix, { timeout = 4000 } = {}) {
+    if (this.disposed) return Promise.reject(new Error('Provider digiCamControl sudah dihentikan'));
+
+    return new Promise((resolve, reject) => {
+      const url = new URL(this.baseUrl + suffix);
+      const req = http.get(
+        {
+          hostname: url.hostname,
+          port: url.port || 80,
+          path: url.pathname + url.search,
+          agent: false,
+          headers: { Connection: 'close' },
+          timeout,
+        },
+        (res) => {
+          const chunks = [];
+          res.on('data', (c) => chunks.push(c));
+          res.on('end', () =>
+            resolve({
+              status: res.statusCode,
+              ok: res.statusCode >= 200 && res.statusCode < 400,
+              text: Buffer.concat(chunks).toString('utf-8'),
+            })
+          );
+          res.on('error', reject);
+        }
+      );
+
+      req.on('timeout', () => {
+        const err = new Error('timeout');
+        err.code = 'ETIMEDOUT';
+        req.destroy(err);
+      });
+      req.on('error', reject);
+    });
+  }
+
   _cmd(cmd, opts) {
-    return this._fetch(`/?CMD=${encodeURIComponent(cmd)}`, opts);
+    return this._httpGet(`/?CMD=${encodeURIComponent(cmd)}`, opts);
   }
 
   /**
@@ -97,6 +152,24 @@ class DigiCamControlService extends ICameraProvider {
     }
   }
 
+  /**
+   * Bersihkan HANYA antrean frame live view.
+   *
+   * Membatalkan seluruh `pending` di sini akan ikut membunuh unduhan foto yang
+   * sedang berjalan di latar belakang untuk frame sebelumnya.
+   */
+  _abortFrames() {
+    for (const controller of this.frameControllers) {
+      try {
+        controller.abort();
+      } catch {
+        /* sudah selesai */
+      }
+      this.pending.delete(controller);
+    }
+    this.frameControllers.clear();
+  }
+
   _abortPending() {
     for (const controller of this.pending) {
       try {
@@ -106,10 +179,15 @@ class DigiCamControlService extends ICameraProvider {
       }
     }
     this.pending.clear();
+    this.frameControllers.clear();
   }
 
   _describeError(err) {
     if (err && err.name === 'AbortError') return 'timeout';
+    const code = err && (err.code || err.cause?.code);
+    if (code === 'ECONNREFUSED') return 'koneksi ditolak — digiCamControl tidak berjalan';
+    if (code === 'ECONNRESET' || code === 'EPIPE') return 'koneksi terputus';
+    if (code === 'ETIMEDOUT') return 'timeout';
     return (err && err.message) || String(err);
   }
 
@@ -231,7 +309,7 @@ class DigiCamControlService extends ICameraProvider {
     const deadline = Date.now() + 6000;
     while (Date.now() < deadline && !this.disposed) {
       try {
-        const frame = await this._fetch(`/liveview.jpg?t=${Date.now()}`, { timeout: 2500, raw: true });
+        const frame = await this._fetch(`/liveview.jpg?t=${Date.now()}`, { timeout: 2500, raw: true, kind: 'frame' });
         if (frame.ok && frame.buffer.length > 1024) {
           this.liveViewActive = true;
           return { ok: true, connected: true, provider: this.name };
@@ -252,7 +330,7 @@ class DigiCamControlService extends ICameraProvider {
 
   async stopLiveView() {
     this.liveViewActive = false;
-    this._abortPending();
+    this._abortFrames();
     try {
       await this._cmd('LiveViewWnd_Hide', { timeout: 3000 });
     } catch {
@@ -266,7 +344,7 @@ class DigiCamControlService extends ICameraProvider {
       return { ok: false, code: 'LIVEVIEW_INACTIVE', error: 'Live view belum aktif' };
     }
     try {
-      const frame = await this._fetch(`/liveview.jpg?t=${Date.now()}`, { timeout: 2500, raw: true });
+      const frame = await this._fetch(`/liveview.jpg?t=${Date.now()}`, { timeout: 2500, raw: true, kind: 'frame' });
       if (!frame.ok || frame.buffer.length < 512) {
         return { ok: false, error: `Frame tidak tersedia (HTTP ${frame.status})` };
       }
@@ -370,7 +448,9 @@ class DigiCamControlService extends ICameraProvider {
     const startedAt = Date.now();
 
     // Bebaskan antrean /liveview.jpg agar request shutter tidak mengantre.
-    this._abortPending();
+    // Sengaja HANYA frame: unduhan foto frame sebelumnya bisa saja masih
+    // berjalan di latar belakang dan tidak boleh ikut dibatalkan.
+    this._abortFrames();
 
     if (!this.armed) {
       // Dipanggil tanpa arm (mis. dari alur lama) — ambil baseline seadanya.
@@ -381,17 +461,50 @@ class DigiCamControlService extends ICameraProvider {
       }
     }
 
+    // Shutter adalah operasi paling kritis dalam sesi: kegagalan koneksi sesaat
+    // tidak boleh langsung membatalkan pose. Timeout TIDAK diulang, karena di
+    // situ perintah kemungkinan sudah sampai dan kamera sedang memotret.
+    const MAX_ATTEMPTS = 3;
+    let lastError = null;
+
     try {
-      await this._cmdRaisingWindow(this.shutterCommand, { timeout: 8000 });
-      this.armed = false;
-      return { ok: true, command: this.shutterCommand, elapsed: Date.now() - startedAt };
-    } catch (err) {
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        try {
+          await this._cmd(this.shutterCommand, { timeout: 8000 });
+          this.armed = false;
+          return {
+            ok: true,
+            command: this.shutterCommand,
+            attempts: attempt,
+            elapsed: Date.now() - startedAt,
+          };
+        } catch (err) {
+          lastError = err;
+          const code = err && (err.code || err.cause?.code);
+          const retryable = code === 'ECONNRESET' || code === 'EPIPE' || code === 'ECONNABORTED';
+          if (!retryable || attempt === MAX_ATTEMPTS) break;
+          console.warn(
+            `[digiCamControl] Shutter percobaan ${attempt} gagal (${code}) — mencoba lagi`
+          );
+          await delay(120);
+        }
+      }
+
       this.armed = false;
       return {
         ok: false,
         code: 'CAPTURE_FAILED',
-        error: `Shutter gagal dipicu (${this._describeError(err)})`,
+        error:
+          `Shutter gagal dipicu: ${this._describeError(lastError)}. ` +
+          `Ini kegagalan koneksi ke digiCamControl, bukan kamera — pastikan digiCamControl masih berjalan.`,
       };
+    } finally {
+      // Jendela digiCamControl bisa terlanjur muncul walau perintahnya gagal.
+      try {
+        this.onWindowRaised?.();
+      } catch {
+        /* jangan ganggu alur capture */
+      }
     }
   }
 
