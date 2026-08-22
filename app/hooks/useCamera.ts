@@ -240,6 +240,11 @@ export function useCamera(options: UseCameraOptions = {}) {
     }
 
     setLiveViewState("starting");
+    // Hentikan polling frame SEBELUM mengirim perintah.
+    // Web server digiCamControl melayani request secara berurutan; kalau frame
+    // loop terus memoll /liveview.jpg, perintah LiveViewWnd_Show terjebak di
+    // belakang antrean dan berakhir timeout.
+    stopFrameLoop();
     setLiveViewUrl(null);
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
@@ -257,7 +262,7 @@ export function useCamera(options: UseCameraOptions = {}) {
     liveViewStartedRef.current = true;
     startFrameLoop();
     return res;
-  }, [activeProvider, startFrameLoop]);
+  }, [activeProvider, startFrameLoop, stopFrameLoop]);
 
   /**
    * Hentikan sementara polling frame tanpa mematikan live view di kamera.

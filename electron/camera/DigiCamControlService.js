@@ -59,6 +59,10 @@ class DigiCamControlService extends ICameraProvider {
     this.frameControllers = new Set();
     /** Sidik jari foto terakhir, dipakai fallback agar tidak mengambil foto duplikat. */
     this.lastCaptureSignature = null;
+    /** Promise startLiveView yang sedang berjalan — mencegah perintah ganda. */
+    this._startingLiveView = null;
+    /** Kualitas foto cukup dikirim sekali per sesi provider. */
+    this.qualityApplied = false;
   }
 
   static signature(buffer) {
@@ -270,6 +274,7 @@ class DigiCamControlService extends ICameraProvider {
    * tidak pernah membatalkan live view atau capture.
    */
   async setImageQuality(value) {
+    this.qualityApplied = true;
     if (!value) return { ok: true, skipped: true };
     try {
       const res = await this._fetch(
@@ -288,20 +293,64 @@ class DigiCamControlService extends ICameraProvider {
     }
   }
 
+  /**
+   * Idempoten dan aman dipanggil berulang.
+   *
+   * Halaman kamera memanggil ini lagi setiap ULANGI/LANJUT. Tanpa penjagaan,
+   * setiap panggilan mengirim LiveViewWnd_Show baru sementara frame loop tetap
+   * memoll /liveview.jpg. Web server digiCamControl melayani request secara
+   * berurutan, jadi perintah Show terjebak di belakang antrean frame dan
+   * berakhir timeout — padahal live view-nya sudah jalan.
+   */
   async startLiveView() {
+    if (this._startingLiveView) return this._startingLiveView;
+    this._startingLiveView = this._doStartLiveView().finally(() => {
+      this._startingLiveView = null;
+    });
+    return this._startingLiveView;
+  }
+
+  async _doStartLiveView() {
+    // Live view sudah jalan? Buktikan dengan satu frame, jangan kirim perintah
+    // apa pun. Ini jalur yang dipakai ULANGI/LANJUT.
+    if (this.liveViewActive) {
+      try {
+        const frame = await this._fetch(`/liveview.jpg?t=${Date.now()}`, {
+          timeout: 2500,
+          raw: true,
+          kind: 'frame',
+        });
+        if (frame.ok && frame.buffer.length > 1024) {
+          return { ok: true, connected: true, provider: this.name, reused: true };
+        }
+      } catch {
+        /* live view ternyata mati — lanjut ke start penuh */
+      }
+      this.liveViewActive = false;
+    }
+
     const health = await this.healthCheck();
     if (!health.connected) return { ok: false, ...health };
 
-    if (this.imageQuality) await this.setImageQuality(this.imageQuality);
+    // Cukup sekali per sesi; mengirimnya tiap kali menambah antrean di server.
+    if (this.imageQuality && !this.qualityApplied) {
+      await this.setImageQuality(this.imageQuality);
+      this.qualityApplied = true;
+    }
 
     try {
-      await this._cmdRaisingWindow('LiveViewWnd_Show', { timeout: 5000 });
+      // Perintah ini membuka jendela GUI dan menginisialisasi live view PTP di
+      // kamera (mirror, autofokus awal). Start dingin bisa lewat dari 5 detik.
+      await this._cmdRaisingWindow('LiveViewWnd_Show', { timeout: 12000 });
     } catch (err) {
       return {
         ok: false,
         connected: false,
         provider: this.name,
-        error: `Gagal memulai live view: ${this._describeError(err)}`,
+        error:
+          `Gagal memulai live view: ${this._describeError(err)}. ` +
+          `digiCamControl tidak menjawab perintah Live View — pastikan kamera menyala, ` +
+          `terhubung USB, dan tidak sedang dipakai aplikasi lain.`,
       };
     }
 
@@ -612,6 +661,7 @@ class DigiCamControlService extends ICameraProvider {
     this.disposed = true;
     this.liveViewActive = false;
     this.armed = false;
+    this._startingLiveView = null;
     this._abortPending();
   }
 }
