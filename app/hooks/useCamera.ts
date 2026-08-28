@@ -56,6 +56,12 @@ interface CameraBridge {
   collectPhoto: () => Promise<{ ok: boolean; dataUrl?: string; filePath?: string; error?: string }>;
   getShutterCommand: () => Promise<string>;
   browseFolder: (current?: string) => Promise<{ ok: boolean; path?: string; canceled?: boolean }>;
+  listCaptureWindows: () => Promise<{
+    ok: boolean;
+    windows: { id: string; name: string }[];
+    suggested?: { id: string; name: string } | null;
+    error?: string;
+  }>;
   getPreviewSource: () => Promise<string>;
   setPreviewSource: (value: string) => Promise<{ ok: boolean; value: string }>;
   getEosUtilityFolder: () => Promise<string>;
@@ -308,10 +314,10 @@ export function useCamera(options: UseCameraOptions = {}) {
 
   const startLiveView = useCallback(async () => {
     const bridge = getCameraBridge();
-    if (!bridge) return { ok: true, deferred: true };
+    if (!bridge) return { ok: true, deferred: true, liveViewSupported: true };
     if (activeProvider === "webcam") {
       // Halaman mengelola getUserMedia-nya sendiri — jangan campur tangan.
-      return { ok: true, deferred: true };
+      return { ok: true, deferred: true, liveViewSupported: true };
     }
 
     setLiveViewState("starting");

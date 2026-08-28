@@ -256,6 +256,34 @@ function registerCameraIpc({ ipcMain, getWindow, sessionRoot }) {
     return { ok: true, path: res.filePaths[0] };
   });
 
+  /**
+   * Daftar jendela yang bisa dijadikan sumber live view.
+   *
+   * Canon EOS Utility tidak punya API live view, tapi ia MENAMPILKANNYA di
+   * jendela "Remote Live View window". Jendela itu bisa ditangkap layar-nya
+   * lewat desktopCapturer, jadi preview tetap bisa masuk ke aplikasi.
+   */
+  ipcMain.handle('camera:listCaptureWindows', async () => {
+    try {
+      const { desktopCapturer } = require('electron');
+      const sources = await desktopCapturer.getSources({
+        types: ['window'],
+        thumbnailSize: { width: 0, height: 0 },
+      });
+      const windows = sources.map((s) => ({ id: s.id, name: s.name }));
+
+      // Jendela live view EOS Utility, dicari dari judulnya. Nama persisnya
+      // berbeda antar versi dan bahasa, jadi dicocokkan longgar.
+      const match = windows.find((w) =>
+        /remote live view|live view/i.test(w.name)
+      ) || windows.find((w) => /eos utility/i.test(w.name));
+
+      return { ok: true, windows, suggested: match || null };
+    } catch (err) {
+      return { ok: false, error: err.message, windows: [] };
+    }
+  });
+
   ipcMain.handle('camera:getPreviewSource', () => manager.getPreviewSource());
   ipcMain.handle('camera:setPreviewSource', (_e, v) => manager.setPreviewSource(v));
   ipcMain.handle('camera:getEosUtilityFolder', () => manager.getEosUtilityFolder());

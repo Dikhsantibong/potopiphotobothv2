@@ -51,6 +51,9 @@ contextBridge.exposeInMainWorld('camera', {
   collectPhoto: () => ipcRenderer.invoke('camera:collectPhoto'),
   getShutterCommand: () => ipcRenderer.invoke('camera:getShutterCommand'),
 
+  // Daftar jendela untuk live view tangkapan layar (EOS Utility)
+  listCaptureWindows: () => ipcRenderer.invoke('camera:listCaptureWindows'),
+
   // Dialog pilih folder (Windows Explorer)
   browseFolder: (current) => ipcRenderer.invoke('camera:browseFolder', current),
 

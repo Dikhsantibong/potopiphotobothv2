@@ -10,7 +10,7 @@ import localforage from "localforage";
 
 import { Mochiy_Pop_One } from "next/font/google";
 
-import { useCamera } from "../hooks/useCamera";
+import { useCamera, getCameraBridge } from "../hooks/useCamera";
 
 
 
@@ -486,6 +486,83 @@ function CameraContent() {
 
 
 
+  /**
+   * Live view untuk Canon EOS Utility.
+   *
+   * EOS Utility tidak punya API live view, tapi ia MENAMPILKANNYA di jendela
+   * "Remote Live View window" miliknya. Jendela itu ditangkap layar-nya lewat
+   * desktopCapturer, lalu dialirkan ke <video> yang sama seperti webcam —
+   * jadi countdown, cuplikan pose, dan rekaman Live Photo ikut bekerja.
+   */
+  const [windowCaptureError, setWindowCaptureError] = useState<string | null>(null);
+
+  /** Menyala saat aplikasi menunggu shutter ditekan manual (mode EOS Utility). */
+  const [shutterHint, setShutterHint] = useState(false);
+
+  const startWindowCapture = useCallback(async () => {
+    const bridge = getCameraBridge();
+    if (!bridge?.listCaptureWindows) return false;
+
+    try {
+      const res = await bridge.listCaptureWindows();
+      if (!res?.ok || !res.suggested) {
+        setWindowCaptureError(
+          "Jendela Live View EOS Utility tidak ditemukan. Buka EOS Utility → Remote Shooting → Live View, dan jangan di-minimize."
+        );
+        return false;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          // @ts-expect-error — constraint khusus Electron untuk tangkapan layar
+          mandatory: {
+            chromeMediaSource: "desktop",
+            chromeMediaSourceId: res.suggested.id,
+            maxWidth: 1920,
+            maxHeight: 1080,
+            maxFrameRate: 30,
+          },
+        },
+      });
+
+      streamRef.current = stream;
+      setWindowCaptureError(null);
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          setCameraReady(true);
+          // Live Photo direkam dari stream yang sama, seperti jalur webcam.
+          try {
+            recorderRef.current = new MediaRecorder(stream, pickRecorderOptions());
+            recorderRef.current.ondataavailable = (e) => {
+              if (e.data.size > 0) chunksRef.current.push(e.data);
+            };
+            recorderRef.current.onstop = () => {
+              const blob = new Blob(chunksRef.current, { type: "video/webm" });
+              chunksRef.current = [];
+              if (blob.size > 0) {
+                setVideos((prev) => {
+                  const u = [...prev];
+                  u[currentFrameRef.current] = blob;
+                  return u;
+                });
+              }
+            };
+          } catch (e) {
+            console.error("MediaRecorder tangkapan jendela gagal", e);
+          }
+        };
+        videoRef.current.play().catch(() => { });
+      }
+      return true;
+    } catch (e) {
+      setWindowCaptureError("Gagal menangkap jendela EOS Utility: " + (e as Error).message);
+      return false;
+    }
+  }, []);
+
   // Jalur digiCamControl: live view via frame JPEG dari Main Process.
 
   useEffect(() => {
@@ -499,7 +576,16 @@ function CameraContent() {
 
       const res = await startLiveView();
 
-      if (!cancelled && res?.ok) setCameraReady(true);
+      if (cancelled) return;
+
+      // Provider melaporkan tidak punya live view (EOS Utility): tangkap
+      // jendela Live View miliknya sebagai gantinya.
+      if (res?.liveViewSupported === false) {
+        await startWindowCapture();
+        return;
+      }
+
+      if (res?.ok) setCameraReady(true);
 
     })();
 
@@ -509,6 +595,7 @@ function CameraContent() {
 
       setCameraReady(false);
 
+      stopCamera();   // hentikan juga stream tangkapan jendela
       void stopLiveView();
 
     };
@@ -1103,6 +1190,10 @@ function CameraContent() {
 
 
 
+    // Mode EOS Utility tidak bisa memicu shutter sendiri — beri tahu user
+    // supaya menekannya, kalau tidak foto tidak akan pernah datang.
+    if (fired?.command === "manual") setShutterHint(true);
+
     // 4. JPEG resolusi penuh diambil di belakang layar lalu menggantikan
 
     //    preview sementara. UI tidak menunggu langkah ini.
@@ -1110,6 +1201,8 @@ function CameraContent() {
     const task = (async () => {
 
       const res = await collectPhoto();
+
+      setShutterHint(false);
 
 
 
@@ -1328,6 +1421,8 @@ function CameraContent() {
     setRefiningFrames((prev) => prev.filter((i) => i !== currentFrame));
 
     setCaptureError(null);
+
+    setShutterHint(false);
 
     photosRef.current = [...photosRef.current];
 
@@ -1596,11 +1691,9 @@ function CameraContent() {
 
                   <span className="text-[10px] font-bold leading-relaxed max-w-xs">
 
-                    Live view tidak tersedia pada Canon EOS Utility. Arahkan pose lewat
-
-                    layar kamera, lalu tekan tombol foto — hasilnya muncul di sini
-
-                    setelah jepretan tersimpan.
+                    {windowCaptureError
+                      ? windowCaptureError
+                      : "Menyiapkan tangkapan jendela Live View EOS Utility..."}
 
                   </span>
 
@@ -1655,6 +1748,18 @@ function CameraContent() {
               )}
 
 
+
+              {/* Mode EOS Utility manual: aplikasi tidak bisa menekan shutter,
+                  jadi katakan dengan jelas kapan harus ditekan. */}
+              {shutterHint && (
+                <div className="absolute inset-x-0 bottom-28 z-40 flex justify-center">
+                  <div className="bg-[#f15a09] px-6 py-3 rounded-2xl shadow-2xl border-2 border-white animate-pulse">
+                    <span className="text-white font-black text-sm uppercase tracking-widest">
+                      Tekan shutter kamera sekarang
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Flash Overlay */}
               {flashActive && <div className="absolute inset-0 bg-white z-50 animate-out fade-out duration-300"></div>}
