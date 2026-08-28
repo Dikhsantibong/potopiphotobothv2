@@ -55,6 +55,7 @@ interface CameraBridge {
   fireShutter: () => Promise<{ ok: boolean; command?: string; error?: string }>;
   collectPhoto: () => Promise<{ ok: boolean; dataUrl?: string; filePath?: string; error?: string }>;
   getShutterCommand: () => Promise<string>;
+  browseFolder: (current?: string) => Promise<{ ok: boolean; path?: string; canceled?: boolean }>;
   getPreviewSource: () => Promise<string>;
   setPreviewSource: (value: string) => Promise<{ ok: boolean; value: string }>;
   getEosUtilityFolder: () => Promise<string>;

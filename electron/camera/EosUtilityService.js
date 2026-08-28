@@ -84,9 +84,10 @@ class EosUtilityService extends ICameraProvider {
         connected: false,
         provider: this.name,
         error:
-          'Folder simpan EOS Utility belum diatur. Buka Settings → Sumber Kamera → ' +
-          'Folder Simpan EOS Utility, dan isi dengan folder yang sama seperti di ' +
-          'EOS Utility → Preferences → Destination Folder.',
+          'Folder simpan EOS Utility belum diatur. Di EOS Utility buka Preferences → ' +
+          'Destination Folder untuk melihat foldernya (bawaannya C:\Users\<nama>\Pictures), ' +
+          'lalu isikan folder itu di Settings → Sumber Kamera. Tombol "Pilih..." bisa ' +
+          'dipakai untuk mencarinya.',
       };
     }
 
@@ -134,9 +135,7 @@ class EosUtilityService extends ICameraProvider {
     let recentFiles = 0;
     if (health.connected) {
       try {
-        recentFiles = fs
-          .readdirSync(this.watchFolder)
-          .filter((f) => /\.jpe?g$/i.test(f)).length;
+        recentFiles = this._listJpegs(this.watchFolder, 2).length;
       } catch {
         /* abaikan */
       }
@@ -169,6 +168,37 @@ class EosUtilityService extends ICameraProvider {
     };
   }
 
+  /**
+   * Kumpulkan file JPEG di folder DAN subfoldernya.
+   *
+   * EOS Utility bawaannya membuat subfolder per tanggal di dalam Destination
+   * Folder, jadi pencarian datar tidak akan menemukan apa pun.
+   *
+   * @param {string} dir folder awal
+   * @param {number} depth berapa tingkat subfolder ditelusuri
+   */
+  _listJpegs(dir, depth = 2) {
+    const out = [];
+    const walk = (current, level) => {
+      let entries;
+      try {
+        entries = fs.readdirSync(current, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const entry of entries) {
+        const full = path.join(current, entry.name);
+        if (entry.isFile()) {
+          if (/\.jpe?g$/i.test(entry.name)) out.push({ filePath: full, name: entry.name });
+        } else if (entry.isDirectory() && level > 0) {
+          walk(full, level - 1);
+        }
+      }
+    };
+    walk(dir, depth);
+    return out;
+  }
+
   // ── Pencarian foto di folder simpan ────────────────────────
   /**
    * Cari foto baru di folder simpan EOS Utility.
@@ -177,19 +207,13 @@ class EosUtilityService extends ICameraProvider {
   _findPhoto(sinceMs) {
     if (!this.watchFolder) return null;
 
-    let entries;
-    try {
-      entries = fs.readdirSync(this.watchFolder, { withFileTypes: true });
-    } catch {
-      return null;
-    }
+    // EOS Utility secara bawaan membuat SUBFOLDER per tanggal (mis. 2026_08_29)
+    // di dalam Destination Folder. Tanpa penelusuran ini, foto tidak akan pernah
+    // ditemukan dan user hanya melihat "tidak ada foto baru".
+    const files = this._listJpegs(this.watchFolder, 2);
 
     let best = null;
-    for (const entry of entries) {
-      if (!entry.isFile()) continue;
-      if (!/\.jpe?g$/i.test(entry.name)) continue;
-
-      const filePath = path.join(this.watchFolder, entry.name);
+    for (const { filePath, name } of files) {
       if (this._consumedFiles.has(filePath)) continue;
 
       let stat;
@@ -203,7 +227,7 @@ class EosUtilityService extends ICameraProvider {
       if (stat.size < 1024) continue; // masih ditulis
 
       if (!best || stat.mtimeMs > best.mtimeMs) {
-        best = { filePath, name: entry.name, mtimeMs: stat.mtimeMs };
+        best = { filePath, name, mtimeMs: stat.mtimeMs };
       }
     }
 
@@ -231,20 +255,11 @@ class EosUtilityService extends ICameraProvider {
    */
   _snapshotExisting() {
     if (!this.watchFolder) return 0;
-    let entries;
-    try {
-      entries = fs.readdirSync(this.watchFolder, { withFileTypes: true });
-    } catch {
-      return 0;
-    }
-    let n = 0;
-    for (const entry of entries) {
-      if (!entry.isFile()) continue;
-      if (!/.jpe?g$/i.test(entry.name)) continue;
-      this._consumedFiles.add(path.join(this.watchFolder, entry.name));
-      n++;
-    }
-    return n;
+    // Rekursif: subfolder tanggal milik EOS Utility ikut dihitung, kalau
+    // tidak, foto lama di dalamnya akan dikira hasil jepretan baru.
+    const files = this._listJpegs(this.watchFolder, 2);
+    for (const { filePath } of files) this._consumedFiles.add(filePath);
+    return files.length;
   }
 
   // ── Alur jepret ─────────────────────────────────────────────

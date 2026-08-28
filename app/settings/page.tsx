@@ -205,6 +205,24 @@ export default function SettingsPage() {
     }
   };
 
+  const handleBrowseEosFolder = async () => {
+    const api = getCameraBridge();
+    if (!api?.browseFolder) {
+      showToast("Fitur ini hanya tersedia di aplikasi desktop", "error");
+      return;
+    }
+    try {
+      const res = await api.browseFolder(eosFolder);
+      if (!res?.ok || !res.path) return;   // dibatalkan
+      setEosFolder(res.path);
+      await api.setEosUtilityFolder?.(res.path);
+      showToast("Folder EOS Utility disimpan", "success");
+      await refreshProviderStatus();
+    } catch (e) {
+      showToast((e as Error).message, "error");
+    }
+  };
+
   const handleSaveEosFolder = async () => {
     const api = getCameraBridge();
     if (!api?.setEosUtilityFolder) {
@@ -843,7 +861,7 @@ export default function SettingsPage() {
                         <div>
                           <label className="block text-[10px] font-bold text-slate-700 mb-1">Folder Simpan EOS Utility</label>
                           <p className="text-[9px] text-slate-400 mb-1.5">
-                            Isi persis sama dengan EOS Utility → Preferences → Destination Folder.
+                            Buka EOS Utility → Preferences → Destination Folder untuk melihat foldernya
                             Aplikasi memantau folder ini untuk mengambil hasil jepretan.
                           </p>
                           <div className="flex gap-2">
@@ -860,6 +878,12 @@ export default function SettingsPage() {
                               placeholder="C:\Users\Nama\Pictures"
                               className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-mono text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
                             />
+                            <button
+                              onClick={handleBrowseEosFolder}
+                              className="px-3 rounded-xl bg-slate-200 text-slate-700 text-[9px] font-black uppercase tracking-widest hover:bg-slate-300 transition-colors shrink-0"
+                            >
+                              Pilih...
+                            </button>
                             <button
                               onClick={handleSaveEosFolder}
                               className="px-3 rounded-xl bg-violet-600 text-white text-[9px] font-black uppercase tracking-widest hover:bg-violet-700 transition-colors shrink-0"

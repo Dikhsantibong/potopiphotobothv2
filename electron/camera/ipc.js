@@ -241,6 +241,21 @@ function registerCameraIpc({ ipcMain, getWindow, sessionRoot }) {
   });
 
   ipcMain.handle('camera:getShutterCommand', () => manager.getShutterCommand());
+  // Dialog pilih folder — jauh lebih ramah daripada mengetik path manual,
+  // apalagi di layar sentuh photobooth.
+  ipcMain.handle('camera:browseFolder', async (_e, current) => {
+    const { dialog } = require('electron');
+    const win = getWindow();
+    const opts = {
+      title: 'Pilih folder simpan EOS Utility',
+      properties: ['openDirectory'],
+      defaultPath: current || undefined,
+    };
+    const res = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts);
+    if (res.canceled || !res.filePaths?.length) return { ok: false, canceled: true };
+    return { ok: true, path: res.filePaths[0] };
+  });
+
   ipcMain.handle('camera:getPreviewSource', () => manager.getPreviewSource());
   ipcMain.handle('camera:setPreviewSource', (_e, v) => manager.setPreviewSource(v));
   ipcMain.handle('camera:getEosUtilityFolder', () => manager.getEosUtilityFolder());

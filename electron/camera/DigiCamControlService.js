@@ -580,7 +580,7 @@ class DigiCamControlService extends ICameraProvider {
     let best = null;
     for (const entry of entries) {
       if (!entry.isFile()) continue;
-      if (!/.jpe?g$/i.test(entry.name)) continue;
+      if (!/\.jpe?g$/i.test(entry.name)) continue;
 
       const filePath = path.join(dir, entry.name);
       let stat;

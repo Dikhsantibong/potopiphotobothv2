@@ -51,6 +51,9 @@ contextBridge.exposeInMainWorld('camera', {
   collectPhoto: () => ipcRenderer.invoke('camera:collectPhoto'),
   getShutterCommand: () => ipcRenderer.invoke('camera:getShutterCommand'),
 
+  // Dialog pilih folder (Windows Explorer)
+  browseFolder: (current) => ipcRenderer.invoke('camera:browseFolder', current),
+
   // Sumber preview: 'provider' atau 'webcam' (Hybrid DSLR Mode)
   getPreviewSource: () => ipcRenderer.invoke('camera:getPreviewSource'),
   setPreviewSource: (value) => ipcRenderer.invoke('camera:setPreviewSource', value),
