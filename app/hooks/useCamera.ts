@@ -10,10 +10,13 @@
  *                              memakai getUserMedia miliknya sendiri (flow existing).
  * - provider 'digicamcontrol'→ hook memoll frame live view lewat IPC dan
  *                              menyediakan liveViewUrl untuk dipasang di <img>.
+ * - provider 'eosutility'    → Canon EOS Utility tidak punya API live view,
+ *                              jadi liveViewSupported=false dan frame loop
+ *                              tidak pernah dijalankan.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export type CameraProvider = "webcam" | "digicamcontrol";
+export type CameraProvider = "webcam" | "digicamcontrol" | "eosutility";
 
 export interface CameraStatus {
   connected: boolean;
@@ -45,13 +48,19 @@ export interface UseCameraOptions {
 interface CameraBridge {
   healthCheck: () => Promise<CameraStatus>;
   getStatus: () => Promise<CameraStatus>;
-  startLiveView: () => Promise<{ ok: boolean; error?: string }>;
+  startLiveView: () => Promise<{ ok: boolean; error?: string; liveViewSupported?: boolean }>;
   stopLiveView: () => Promise<{ ok: boolean }>;
   capture: () => Promise<{ ok: boolean; dataUrl?: string; filePath?: string; error?: string }>;
   armCapture: () => Promise<{ ok: boolean; error?: string }>;
   fireShutter: () => Promise<{ ok: boolean; command?: string; error?: string }>;
   collectPhoto: () => Promise<{ ok: boolean; dataUrl?: string; filePath?: string; error?: string }>;
   getShutterCommand: () => Promise<string>;
+  getPreviewSource: () => Promise<string>;
+  setPreviewSource: (value: string) => Promise<{ ok: boolean; value: string }>;
+  getEosUtilityFolder: () => Promise<string>;
+  setEosUtilityFolder: (value: string) => Promise<{ ok: boolean; value: string }>;
+  getEosUtilityShutter: () => Promise<string>;
+  setEosUtilityShutter: (value: string) => Promise<{ ok: boolean; value: string }>;
   setShutterCommand: (value: string) => Promise<{ ok: boolean; value: string }>;
   /** code: 'BUSY' (operasi kritis jalan), 'ABORTED', 'LIVEVIEW_LOST', 'LIVEVIEW_INACTIVE' */
   getFrame: () => Promise<{ ok: boolean; data?: Uint8Array; mime?: string; error?: string; code?: string }>;
@@ -79,7 +88,7 @@ export function useCamera(options: UseCameraOptions = {}) {
   const [providerReady, setProviderReady] = useState(false);
   const [connected, setConnected] = useState(false);
   const [liveViewUrl, setLiveViewUrl] = useState<string | null>(null);
-  const [liveViewState, setLiveViewState] = useState<"idle" | "starting" | "running" | "reconnecting" | "error">("idle");
+  const [liveViewState, setLiveViewState] = useState<"idle" | "starting" | "running" | "reconnecting" | "unsupported" | "error">("idle");
   const [isCapturing, setIsCapturing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -99,6 +108,18 @@ export function useCamera(options: UseCameraOptions = {}) {
   const reconnectingRef = useRef(false);
   /** Percobaan sambung ulang beruntun, untuk backoff. */
   const reconnectAttemptsRef = useRef(0);
+  /**
+   * Sebagian provider tidak menyediakan live view sama sekali (Canon EOS
+   * Utility). Frame loop tidak boleh dijalankan untuk provider seperti itu —
+   * hanya membuang CPU dan mengisi log dengan NOT_SUPPORTED.
+   */
+  const [liveViewSupported, setLiveViewSupported] = useState(true);
+  const liveViewSupportedRef = useRef(true);
+  /**
+   * Hybrid DSLR Mode: preview diambil dari webcam (HDMI capture card),
+   * sementara foto tetap dari provider DSLR. Default 'provider' = perilaku lama.
+   */
+  const [previewSource, setPreviewSourceState] = useState<"provider" | "webcam">("provider");
 
   const setFrame = useCallback((bytes: Uint8Array, mime: string) => {
     const blob = new Blob([new Uint8Array(bytes)], { type: mime || "image/jpeg" });
@@ -127,6 +148,14 @@ export function useCamera(options: UseCameraOptions = {}) {
         const name = await bridge.getProvider();
         if (!alive) return;
         setActiveProvider(name || "webcam");
+
+        try {
+          const src = await bridge.getPreviewSource?.();
+          if (alive && (src === "webcam" || src === "provider")) setPreviewSourceState(src);
+        } catch {
+          /* pakai default 'provider' */
+        }
+
         const health = await bridge.healthCheck();
         if (!alive) return;
         setConnected(!!health?.connected);
@@ -146,6 +175,9 @@ export function useCamera(options: UseCameraOptions = {}) {
       // Reset live view: frame dari provider lama tidak boleh tertinggal.
       setLiveViewUrl(null);
       setLiveViewState("idle");
+      // Dukungan live view dinilai ulang saat startLiveView provider baru.
+      liveViewSupportedRef.current = true;
+      setLiveViewSupported(true);
       if (objectUrlRef.current) {
         URL.revokeObjectURL(objectUrlRef.current);
         objectUrlRef.current = null;
@@ -214,6 +246,8 @@ export function useCamera(options: UseCameraOptions = {}) {
   const startFrameLoop = useCallback(() => {
     const bridge = getCameraBridge();
     if (!bridge) return;
+    // Provider tanpa live view (mis. EOS Utility) tidak punya frame untuk dipoll.
+    if (!liveViewSupportedRef.current) return;
     stopFrameLoop();
     const state = { cancelled: false, timer: null as ReturnType<typeof setTimeout> | null };
     pollingRef.current = state;
@@ -299,6 +333,18 @@ export function useCamera(options: UseCameraOptions = {}) {
     }
     setConnected(true);
     setError(null);
+
+    // Provider boleh menyatakan live view tidak tersedia; itu bukan kegagalan.
+    const supported = res?.liveViewSupported !== false;
+    liveViewSupportedRef.current = supported;
+    setLiveViewSupported(supported);
+
+    if (!supported) {
+      setLiveViewState("unsupported");
+      liveViewStartedRef.current = false; // jangan pernah coba sambung ulang
+      return res;
+    }
+
     liveViewStartedRef.current = true;
     reconnectAttemptsRef.current = 0;
     startFrameLoop();
@@ -451,6 +497,13 @@ export function useCamera(options: UseCameraOptions = {}) {
     stopLiveView,
     pauseFrames,
     resumeFrames,
+    liveViewSupported,
+    previewSource,
+    /**
+     * Preview harus diambil dari getUserMedia? Benar bila provider-nya memang
+     * webcam, ATAU Hybrid DSLR Mode aktif (preview HDMI, foto lewat DSLR).
+     */
+    previewFromWebcam: activeProvider === "webcam" || previewSource === "webcam",
     capture,
     armCapture,
     fireShutter,

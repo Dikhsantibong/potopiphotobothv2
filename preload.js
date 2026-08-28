@@ -50,6 +50,16 @@ contextBridge.exposeInMainWorld('camera', {
   fireShutter: () => ipcRenderer.invoke('camera:fireShutter'),
   collectPhoto: () => ipcRenderer.invoke('camera:collectPhoto'),
   getShutterCommand: () => ipcRenderer.invoke('camera:getShutterCommand'),
+
+  // Sumber preview: 'provider' atau 'webcam' (Hybrid DSLR Mode)
+  getPreviewSource: () => ipcRenderer.invoke('camera:getPreviewSource'),
+  setPreviewSource: (value) => ipcRenderer.invoke('camera:setPreviewSource', value),
+
+  // Canon EOS Utility (provider berbasis folder simpan)
+  getEosUtilityFolder: () => ipcRenderer.invoke('camera:getEosUtilityFolder'),
+  setEosUtilityFolder: (value) => ipcRenderer.invoke('camera:setEosUtilityFolder', value),
+  getEosUtilityShutter: () => ipcRenderer.invoke('camera:getEosUtilityShutter'),
+  setEosUtilityShutter: (value) => ipcRenderer.invoke('camera:setEosUtilityShutter', value),
   setShutterCommand: (value) => ipcRenderer.invoke('camera:setShutterCommand', value),
   getFrame: () => ipcRenderer.invoke('camera:getFrame'),
   getLastCaptured: () => ipcRenderer.invoke('camera:getLastCaptured'),

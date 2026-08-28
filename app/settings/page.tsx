@@ -46,6 +46,11 @@ export default function SettingsPage() {
   const [providerBusy, setProviderBusy] = useState(false);
   const [imageQuality, setImageQuality] = useState<string>("");
   const [shutterCommand, setShutterCommand] = useState<string>("CaptureNoAf");
+  // Canon EOS Utility: folder simpan Remote Shooting + cara shutter dipicu.
+  const [eosFolder, setEosFolder] = useState<string>("");
+  const [eosShutter, setEosShutter] = useState<string>("manual");
+  // Hybrid DSLR Mode: preview dari HDMI capture card, foto dari DSLR.
+  const [previewSource, setPreviewSource] = useState<string>("provider");
 
   // Queue state
   const [uploadQueue, setUploadQueue] = useState<any[]>([]);
@@ -165,8 +170,72 @@ export default function SettingsPage() {
     } catch {
       /* opsional */
     }
+    try {
+      const src = await api.getPreviewSource?.();
+      if (typeof src === "string" && src) setPreviewSource(src);
+    } catch {
+      /* opsional */
+    }
+    try {
+      const folder = await api.getEosUtilityFolder?.();
+      if (typeof folder === "string") setEosFolder(folder);
+      const mode = await api.getEosUtilityShutter?.();
+      if (typeof mode === "string" && mode) setEosShutter(mode);
+    } catch {
+      /* opsional */
+    }
     await refreshProviderStatus();
   }, [refreshProviderStatus]);
+
+  const handleSelectPreviewSource = async (value: string) => {
+    setPreviewSource(value);
+    const api = getCameraBridge();
+    if (!api?.setPreviewSource) return;
+    try {
+      await api.setPreviewSource(value);
+      showToast(
+        value === "webcam"
+          ? "Preview dari HDMI capture card — pilih perangkatnya di Pilih Kamera"
+          : "Preview dari sumber kamera itu sendiri",
+        "success"
+      );
+      await refreshProviderStatus();
+    } catch (e) {
+      showToast((e as Error).message, "error");
+    }
+  };
+
+  const handleSaveEosFolder = async () => {
+    const api = getCameraBridge();
+    if (!api?.setEosUtilityFolder) {
+      showToast("Fitur ini hanya tersedia di aplikasi desktop", "error");
+      return;
+    }
+    try {
+      await api.setEosUtilityFolder(eosFolder);
+      showToast("Folder EOS Utility disimpan", "success");
+      await refreshProviderStatus();
+    } catch (e) {
+      showToast((e as Error).message, "error");
+    }
+  };
+
+  const handleSelectEosShutter = async (value: string) => {
+    setEosShutter(value);
+    const api = getCameraBridge();
+    if (!api?.setEosUtilityShutter) return;
+    try {
+      await api.setEosUtilityShutter(value);
+      showToast(
+        value === "manual"
+          ? "Shutter manual — tekan remote atau tombol kamera setelah countdown"
+          : "Shutter keystroke — eksperimental, jendela EOS Utility harus terbuka",
+        "success"
+      );
+    } catch (e) {
+      showToast((e as Error).message, "error");
+    }
+  };
 
   const handleSelectShutter = async (value: string) => {
     setShutterCommand(value);
@@ -704,10 +773,11 @@ export default function SettingsPage() {
                     </div>
                     <p className="text-[9px] text-slate-400 mb-2">Pilih jalur pengambilan gambar dari Canon EOS</p>
 
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       {[
                         { id: "webcam" as CameraProvider, label: "Webcam Utility", sub: "Default" },
                         { id: "digicamcontrol" as CameraProvider, label: "DigiCamControl", sub: "Web Server 5513" },
+                        { id: "eosutility" as CameraProvider, label: "EOS Utility", sub: "Folder simpan" },
                       ].map((opt) => (
                         <button
                           key={opt.id}
@@ -734,6 +804,96 @@ export default function SettingsPage() {
                     {providerStatus?.error && (
                       <div className="mt-2 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
                         <p className="text-[9px] text-rose-700 leading-relaxed break-words">{providerStatus.error}</p>
+                      </div>
+                    )}
+
+                    {cameraProvider !== "webcam" && (
+                      <div className="mt-2">
+                        <label className="block text-[10px] font-bold text-slate-700 mb-1">Sumber Preview Layar</label>
+                        <p className="text-[9px] text-slate-400 mb-1.5">
+                          Hybrid DSLR Mode: sambungkan HDMI kamera ke capture card USB untuk
+                          preview mulus, sementara foto tetap diambil lewat USB. Dua jalur
+                          terpisah, tidak berebut kamera.
+                        </p>
+                        <select
+                          value={previewSource}
+                          onChange={(e) => handleSelectPreviewSource(e.target.value)}
+                          disabled={providerBusy}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400 disabled:opacity-50"
+                        >
+                          <option value="provider">Dari sumber kamera itu sendiri (bawaan)</option>
+                          <option value="webcam">Dari HDMI capture card / webcam (Hybrid)</option>
+                        </select>
+
+                        {previewSource === "webcam" && (
+                          <div className="mt-2 bg-emerald-50/80 border border-emerald-200/60 rounded-lg px-3 py-2">
+                            <p className="text-[9px] text-emerald-800/90 leading-relaxed">
+                              Pilih perangkat capture card di <strong>Pilih Kamera</strong> di bawah.
+                              Di kamera: mode dial ke <strong>Movie</strong> agar HDMI bersih, matikan
+                              auto power-off, dan pakai adaptor AC. Live view DSLR tidak lagi dipakai,
+                              jadi jendela digiCamControl tidak akan muncul dan jepretan lebih cepat.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {cameraProvider === "eosutility" && (
+                      <div className="mt-2 space-y-2">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-700 mb-1">Folder Simpan EOS Utility</label>
+                          <p className="text-[9px] text-slate-400 mb-1.5">
+                            Isi persis sama dengan EOS Utility → Preferences → Destination Folder.
+                            Aplikasi memantau folder ini untuk mengambil hasil jepretan.
+                          </p>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={eosFolder}
+                              onFocus={() => onInputFocus("eosFolder", eosFolder)}
+                              onChange={(e) => {
+                                setEosFolder(e.target.value);
+                                if (keyboardRef.current && focusedInput === "eosFolder") {
+                                  keyboardRef.current.setInput(e.target.value);
+                                }
+                              }}
+                              placeholder="C:\Users\Nama\Pictures"
+                              className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-mono text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
+                            />
+                            <button
+                              onClick={handleSaveEosFolder}
+                              className="px-3 rounded-xl bg-violet-600 text-white text-[9px] font-black uppercase tracking-widest hover:bg-violet-700 transition-colors shrink-0"
+                            >
+                              Simpan
+                            </button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-700 mb-1">Cara Memicu Shutter</label>
+                          <p className="text-[9px] text-slate-400 mb-1.5">
+                            EOS Utility tidak punya API, jadi aplikasi tidak bisa menekan shutter
+                            seperti pada DigiCamControl.
+                          </p>
+                          <select
+                            value={eosShutter}
+                            onChange={(e) => handleSelectEosShutter(e.target.value)}
+                            disabled={providerBusy}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400 disabled:opacity-50"
+                          >
+                            <option value="manual">Manual — remote shutter / tombol kamera (disarankan)</option>
+                            <option value="keystroke">Keystroke ke jendela EOS Utility (eksperimental)</option>
+                          </select>
+                        </div>
+
+                        <div className="bg-amber-50/80 border border-amber-200/50 rounded-lg px-3 py-2">
+                          <p className="text-[9px] text-amber-700/90 leading-relaxed">
+                            <strong>Batasan EOS Utility:</strong> tidak menyediakan live view untuk
+                            aplikasi lain, dan shutter tidak bisa dipicu lewat API — ini batasan
+                            software Canon, bukan aplikasi. Untuk photobooth swalayan tanpa
+                            operator, <strong>DigiCamControl</strong> tetap pilihan yang tepat.
+                          </p>
+                        </div>
                       </div>
                     )}
 

@@ -439,6 +439,10 @@ function CameraContent() {
 
     resumeFrames,
 
+    liveViewSupported,
+
+    previewFromWebcam,
+
     armCapture,
 
     fireShutter,
@@ -471,13 +475,14 @@ function CameraContent() {
 
   useEffect(() => {
 
-    if (!providerReady || !usesWebcam) return;
+    // Hybrid DSLR Mode ikut memakai stream ini untuk preview.
+    if (!providerReady || !previewFromWebcam) return;
 
     startCamera();
 
     return () => stopCamera();
 
-  }, [providerReady, usesWebcam, startCamera, stopCamera]);
+  }, [providerReady, previewFromWebcam, startCamera, stopCamera]);
 
 
 
@@ -485,7 +490,8 @@ function CameraContent() {
 
   useEffect(() => {
 
-    if (!providerReady || usesWebcam) return;
+    // Preview dari webcam: live view provider tidak perlu dinyalakan sama sekali.
+    if (!providerReady || previewFromWebcam) return;
 
     let cancelled = false;
 
@@ -507,7 +513,7 @@ function CameraContent() {
 
     };
 
-  }, [providerReady, usesWebcam, startLiveView, stopLiveView]);
+  }, [providerReady, previewFromWebcam, startLiveView, stopLiveView]);
 
 
 
@@ -523,11 +529,11 @@ function CameraContent() {
 
   useEffect(() => {
 
-    if (!providerReady || usesWebcam) return;
+    if (!providerReady || previewFromWebcam) return;
 
     setIsMirrored(false);
 
-  }, [providerReady, usesWebcam]);
+  }, [providerReady, previewFromWebcam]);
 
 
 
@@ -539,13 +545,16 @@ function CameraContent() {
 
   useEffect(() => {
 
-    if (usesWebcam || !cameraReady) return;
+    if (previewFromWebcam || !cameraReady) return;
+
+    // Provider tanpa live view (EOS Utility) tidak punya frame untuk dipoll.
+    if (!liveViewSupported) return;
 
     if (showPreview || isCapturing) pauseFrames();
 
     else resumeFrames();
 
-  }, [usesWebcam, cameraReady, showPreview, isCapturing, pauseFrames, resumeFrames]);
+  }, [previewFromWebcam, cameraReady, showPreview, isCapturing, liveViewSupported, pauseFrames, resumeFrames]);
 
 
 
@@ -940,6 +949,41 @@ function CameraContent() {
    */
 
   const snapshotLiveView = (): string | null => {
+
+    // Hybrid DSLR Mode: preview datang dari <video> webcam (HDMI capture
+    // card), bukan dari frame live view. Ambil cuplikan dari sumber yang
+    // memang sedang tampil di layar.
+
+    if (previewFromWebcam) {
+
+      const video = videoRef.current;
+
+      if (!video || !video.videoWidth) return null;
+
+      const canvas = document.createElement("canvas");
+
+      canvas.width = video.videoWidth;
+
+      canvas.height = video.videoHeight;
+
+      const ctx = canvas.getContext("2d");
+
+      if (!ctx) return null;
+
+      if (isMirrored) {
+
+        ctx.translate(canvas.width, 0);
+
+        ctx.scale(-1, 1);
+
+      }
+
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      return canvas.toDataURL("image/jpeg", 0.9);
+
+    }
+
 
     const img = liveImgRef.current;
 
@@ -1347,7 +1391,7 @@ function CameraContent() {
 
       // Start recording at the beginning of countdown
 
-      if (usesWebcam) {
+      if (previewFromWebcam) {
 
         if (recorderRef.current && recorderRef.current.state === "inactive") {
 
@@ -1493,7 +1537,7 @@ function CameraContent() {
 
             <div className="absolute inset-0 bg-slate-900 overflow-hidden">
 
-              {usesWebcam ? (
+              {previewFromWebcam ? (
 
                 <video
 
@@ -1538,6 +1582,29 @@ function CameraContent() {
                   }}
 
                 />
+
+) : !liveViewSupported ? (
+
+                /* Canon EOS Utility tidak menyediakan live view untuk aplikasi
+                   lain. Tampilkan panduan, bukan spinner yang tak berujung. */
+
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-8 text-center text-white/80">
+
+                  <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+
+                  <span className="text-[11px] font-black uppercase tracking-widest">Mode EOS Utility</span>
+
+                  <span className="text-[10px] font-bold leading-relaxed max-w-xs">
+
+                    Live view tidak tersedia pada Canon EOS Utility. Arahkan pose lewat
+
+                    layar kamera, lalu tekan tombol foto — hasilnya muncul di sini
+
+                    setelah jepretan tersimpan.
+
+                  </span>
+
+                </div>
 
               ) : (
 
@@ -1807,7 +1874,7 @@ function CameraContent() {
 
                     >
 
-                      {isCurrent && !showPreview && usesWebcam ? (
+                      {isCurrent && !showPreview && previewFromWebcam ? (
 
                         <video
 

@@ -16,6 +16,7 @@ const path = require('path');
 
 const { WebcamProviderService } = require('./WebcamProviderService');
 const { DigiCamControlService } = require('./DigiCamControlService');
+const { EosUtilityService } = require('./EosUtilityService');
 const config = require('./cameraConfig');
 
 class CameraProviderManager {
@@ -44,8 +45,17 @@ class CameraProviderManager {
         sessionDir: this.currentSessionDir || this.sessionRoot,
         imageQuality: config.readDigiCamQuality(),
         shutterCommand: config.readDigiCamShutter(),
+        // Saat preview datang dari webcam (Hybrid DSLR Mode), live view
+        // digiCamControl tidak perlu dinyalakan — jendelanya pun tidak muncul.
+        liveViewForCapture: config.readPreviewSource() !== 'webcam',
         // Dipanggil tepat setelah perintah yang memunculkan jendela digiCamControl.
         onWindowRaised: () => this.windowGuard?.reclaim(),
+      });
+    }
+    if (name === 'eosutility') {
+      return new EosUtilityService({
+        watchFolder: config.readEosUtilityFolder(),
+        shutterMode: config.readEosUtilityShutter(),
       });
     }
     return new WebcamProviderService({ bridge: this.bridge });
@@ -231,6 +241,23 @@ class CameraProviderManager {
       return { ok: true, sessionActive: false };
     }
 
+    if (this.activeName === 'eosutility' && this.provider) {
+      // EOS Utility memakai folder simpannya sendiri; aplikasi hanya memantau.
+      // Jendela tidak dikunci karena mode keystroke justru perlu mengaktifkan
+      // jendela EOS Utility.
+      this.windowGuard?.setPinned(false);
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const dir = path.join(this.sessionRoot, stamp);
+      try {
+        fs.mkdirSync(dir, { recursive: true });
+        this.currentSessionDir = dir;
+      } catch (err) {
+        return { ok: true, sessionActive: true, warning: `Gagal membuat folder sesi: ${err.message}` };
+      }
+      this.pruneOldSessions();
+      return { ok: true, sessionActive: true, sessionDir: dir };
+    }
+
     if (this.activeName !== 'digicamcontrol' || !this.provider) {
       // Provider webcam tidak memunculkan jendela pihak ketiga.
       this.windowGuard?.setPinned(false);
@@ -385,6 +412,42 @@ class CameraProviderManager {
     } catch (err) {
       return { ok: false, provider: this.activeName, error: err.message };
     }
+  }
+
+  getPreviewSource() {
+    return config.readPreviewSource();
+  }
+
+  setPreviewSource(value) {
+    const stored = config.writePreviewSource(value);
+    // Provider DSLR perlu tahu: saat preview dari webcam, live view kamera
+    // tidak perlu dinyalakan sama sekali.
+    if (this.provider) this.provider.liveViewForCapture = stored !== 'webcam';
+    return { ok: true, value: stored };
+  }
+
+  getEosUtilityFolder() {
+    return config.readEosUtilityFolder();
+  }
+
+  setEosUtilityFolder(value) {
+    const stored = config.writeEosUtilityFolder(value);
+    if (this.provider && this.activeName === 'eosutility') {
+      this.provider.watchFolder = stored;
+    }
+    return { ok: true, value: stored };
+  }
+
+  getEosUtilityShutter() {
+    return config.readEosUtilityShutter();
+  }
+
+  setEosUtilityShutter(value) {
+    const stored = config.writeEosUtilityShutter(value);
+    if (this.provider && this.activeName === 'eosutility') {
+      this.provider.shutterMode = stored;
+    }
+    return { ok: true, value: stored };
   }
 
   getShutterCommand() {

@@ -43,6 +43,15 @@ class DigiCamControlService extends ICameraProvider {
     // Dipanggil setelah perintah yang memunculkan jendela GUI digiCamControl,
     // agar jendela photobooth bisa direbut kembali ke depan.
     this.onWindowRaised = typeof options.onWindowRaised === 'function' ? options.onWindowRaised : null;
+    /**
+     * Apakah live view kamera perlu dinyalakan untuk bisa memotret.
+     *
+     * Default true — perilaku lama. Diset false pada Hybrid DSLR Mode, saat
+     * preview datang dari HDMI capture card: live view digiCamControl tidak
+     * dibutuhkan sama sekali, jendelanya tidak muncul, dan web server tidak
+     * terbebani polling frame.
+     */
+    this.liveViewForCapture = options.liveViewForCapture !== false;
     this.liveViewActive = false;
     /** Nama file terakhir sebelum shutter — diambil saat arm, bukan saat jepret. */
     this.armedBaseline = null;
@@ -635,7 +644,9 @@ class DigiCamControlService extends ICameraProvider {
   }
 
   async _doArmCapture() {
-    if (!this.liveViewActive) {
+    // Pada Hybrid DSLR Mode preview datang dari webcam, jadi live view kamera
+    // sengaja dibiarkan mati — shutter tetap bisa dipicu tanpanya.
+    if (this.liveViewForCapture && !this.liveViewActive) {
       const lv = await this.startLiveView();
       if (!lv.ok) return { ok: false, code: 'LIVEVIEW_FAILED', error: lv.error };
     }
@@ -874,7 +885,10 @@ class DigiCamControlService extends ICameraProvider {
 
     // Kamera menutup live view saat shutter jalan. Nyalakan lagi tanpa menunggu
     // supaya frame berikutnya sudah siap begitu user menekan ULANGI/LANJUT.
-    this._cmdRaisingWindow('LiveViewWnd_Show', { timeout: 4000 }).catch(() => { });
+    // Dilewati pada Hybrid DSLR Mode — live view memang tidak dipakai di sana.
+    if (this.liveViewForCapture) {
+      this._cmdRaisingWindow('LiveViewWnd_Show', { timeout: 4000 }).catch(() => { });
+    }
 
     // Buffer dikembalikan mentah; lapisan IPC yang mengecilkannya sebelum
     // dikirim ke renderer. File di folder sesi tetap resolusi penuh.

@@ -241,6 +241,12 @@ function registerCameraIpc({ ipcMain, getWindow, sessionRoot }) {
   });
 
   ipcMain.handle('camera:getShutterCommand', () => manager.getShutterCommand());
+  ipcMain.handle('camera:getPreviewSource', () => manager.getPreviewSource());
+  ipcMain.handle('camera:setPreviewSource', (_e, v) => manager.setPreviewSource(v));
+  ipcMain.handle('camera:getEosUtilityFolder', () => manager.getEosUtilityFolder());
+  ipcMain.handle('camera:setEosUtilityFolder', (_e, v) => manager.setEosUtilityFolder(v));
+  ipcMain.handle('camera:getEosUtilityShutter', () => manager.getEosUtilityShutter());
+  ipcMain.handle('camera:setEosUtilityShutter', (_e, v) => manager.setEosUtilityShutter(v));
   ipcMain.handle('camera:setShutterCommand', (_e, value) => manager.setShutterCommand(value));
   ipcMain.handle('camera:getLastCaptured', () => manager.getLastCaptured());
   ipcMain.handle('camera:downloadPhoto', (_e, filename) => manager.downloadPhoto(filename));

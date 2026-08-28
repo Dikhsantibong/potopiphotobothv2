@@ -1,6 +1,6 @@
 {
   "name": "potopi-photobooth",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "private": true,
   "main": "main.js",
   "author": "CtechAgency",
@@ -26,7 +26,9 @@
     "test:collect": "node scripts/test-collect.mjs",
     "test:resilience": "node scripts/test-resilience.mjs",
     "test:rescue": "node scripts/test-rescue.mjs",
-    "test:reconnect": "node scripts/test-reconnect.mjs"
+    "test:reconnect": "node scripts/test-reconnect.mjs",
+    "test:eosutility": "node scripts/test-eosutility.mjs",
+    "test:hybrid": "node scripts/test-hybrid.mjs"
   },
   "dependencies": {
     "@ffmpeg/core": "^0.12.6",

@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = require('path');
 
 const KEY = 'CAMERA_PROVIDER';
-const PROVIDERS = ['webcam', 'digicamcontrol'];
+const PROVIDERS = ['webcam', 'digicamcontrol', 'eosutility'];
 const DEFAULT_PROVIDER = 'webcam';
 
 function getEnvPath() {
@@ -181,9 +181,123 @@ function writeDigiCamShutter(value) {
   return normalized;
 }
 
+/**
+ * Folder tempat Canon EOS Utility menyimpan hasil Remote Shooting.
+ * Harus sama dengan EOS Utility → Preferences → Destination Folder.
+ */
+function readEosUtilityFolder() {
+  const fromEnv = (process.env.EOSUTILITY_FOLDER || '').trim();
+  if (fromEnv) return fromEnv;
+  try {
+    const envPath = getEnvPath();
+    if (fs.existsSync(envPath)) {
+      const fromFile = parseEnvContent(fs.readFileSync(envPath, 'utf-8')).EOSUTILITY_FOLDER;
+      if (fromFile) return fromFile.trim();
+    }
+  } catch {
+    /* pakai default */
+  }
+  return '';
+}
+
+function writeEosUtilityFolder(value) {
+  return writeEnvKey('EOSUTILITY_FOLDER', (value || '').trim());
+}
+
+/**
+ * Cara shutter dipicu pada provider EOS Utility.
+ * 'manual'    — aplikasi menunggu foto muncul (remote shutter fisik/operator)
+ * 'keystroke' — kirim tombol ke jendela EOS Utility (eksperimental)
+ */
+const EOSUTILITY_SHUTTER_MODES = ['manual', 'keystroke'];
+const DEFAULT_EOSUTILITY_SHUTTER = 'manual';
+
+function readEosUtilityShutter() {
+  const pick = (v) => (EOSUTILITY_SHUTTER_MODES.includes((v || '').trim()) ? v.trim() : null);
+  const fromEnv = pick(process.env.EOSUTILITY_SHUTTER);
+  if (fromEnv) return fromEnv;
+  try {
+    const envPath = getEnvPath();
+    if (fs.existsSync(envPath)) {
+      const fromFile = pick(parseEnvContent(fs.readFileSync(envPath, 'utf-8')).EOSUTILITY_SHUTTER);
+      if (fromFile) return fromFile;
+    }
+  } catch {
+    /* pakai default */
+  }
+  return DEFAULT_EOSUTILITY_SHUTTER;
+}
+
+function writeEosUtilityShutter(value) {
+  const normalized = EOSUTILITY_SHUTTER_MODES.includes(value) ? value : DEFAULT_EOSUTILITY_SHUTTER;
+  return writeEnvKey('EOSUTILITY_SHUTTER', normalized);
+}
+
+/**
+ * Dari mana preview di halaman kamera diambil.
+ *
+ * 'provider' (default) — dari provider foto itu sendiri; perilaku lama persis.
+ * 'webcam'             — dari perangkat webcam terpisah, biasanya HDMI capture
+ *                        card yang dicolok ke output HDMI kamera. Ini "Hybrid
+ *                        DSLR Mode" yang dipakai photobooth komersial: preview
+ *                        lewat HDMI, foto lewat USB, dua jalur yang tidak
+ *                        berebut device.
+ */
+const PREVIEW_SOURCES = ['provider', 'webcam'];
+const DEFAULT_PREVIEW_SOURCE = 'provider';
+
+function readPreviewSource() {
+  const pick = (v) => (PREVIEW_SOURCES.includes((v || '').trim()) ? v.trim() : null);
+  const fromEnv = pick(process.env.PREVIEW_SOURCE);
+  if (fromEnv) return fromEnv;
+  try {
+    const envPath = getEnvPath();
+    if (fs.existsSync(envPath)) {
+      const fromFile = pick(parseEnvContent(fs.readFileSync(envPath, 'utf-8')).PREVIEW_SOURCE);
+      if (fromFile) return fromFile;
+    }
+  } catch {
+    /* pakai default */
+  }
+  return DEFAULT_PREVIEW_SOURCE;
+}
+
+function writePreviewSource(value) {
+  const normalized = PREVIEW_SOURCES.includes(value) ? value : DEFAULT_PREVIEW_SOURCE;
+  return writeEnvKey('PREVIEW_SOURCE', normalized);
+}
+
+/** Tulis satu key ke .env mutable tanpa merusak key lain. */
+function writeEnvKey(key, value) {
+  const envPath = getEnvPath();
+  let existing = {};
+  try {
+    if (fs.existsSync(envPath)) {
+      existing = parseEnvContent(fs.readFileSync(envPath, 'utf-8'));
+    }
+  } catch {
+    /* file baru */
+  }
+  existing[key] = value;
+  fs.mkdirSync(path.dirname(envPath), { recursive: true });
+  fs.writeFileSync(envPath, buildEnvContent(existing), 'utf-8');
+  process.env[key] = value;
+  return value;
+}
+
 module.exports = {
   KEY,
   PROVIDERS,
+  PREVIEW_SOURCES,
+  DEFAULT_PREVIEW_SOURCE,
+  readPreviewSource,
+  writePreviewSource,
+  EOSUTILITY_SHUTTER_MODES,
+  DEFAULT_EOSUTILITY_SHUTTER,
+  readEosUtilityFolder,
+  writeEosUtilityFolder,
+  readEosUtilityShutter,
+  writeEosUtilityShutter,
   DEFAULT_PROVIDER,
   SHUTTER_COMMANDS,
   DEFAULT_SHUTTER,
