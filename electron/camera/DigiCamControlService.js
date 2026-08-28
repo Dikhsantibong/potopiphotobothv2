@@ -63,6 +63,34 @@ class DigiCamControlService extends ICameraProvider {
     this._startingLiveView = null;
     /** Kualitas foto cukup dikirim sekali per sesi provider. */
     this.qualityApplied = false;
+    /**
+     * Jumlah operasi kritis yang sedang berjalan (arm, shutter, ambil file).
+     *
+     * Web server digiCamControl melayani request satu per satu. Selama operasi
+     * kritis berlangsung, request frame live view di-skip agar tidak menyerobot
+     * antrean — itulah yang dulu membuat polling lastcaptured kelaparan sampai
+     * 12 detik dan berakhir "Kamera tidak merespon".
+     */
+    this._criticalBusy = 0;
+    /** Nama file terakhir yang berhasil diunduh — dipakai sebagai baseline. */
+    this.lastCollectedFilename = null;
+    /** Pengambilan file yang sedang berjalan di latar belakang. */
+    this._activeCollect = null;
+    /**
+     * Kegagalan frame beruntun. Kalau digiCamControl crash atau di-restart,
+     * liveViewActive di sisi kita tetap true dan preview membeku selamanya —
+     * counter ini yang mendeteksinya lalu memicu penyambungan ulang.
+     */
+    this._frameFailures = 0;
+    /** Waktu shutter terakhir dipicu — patokan untuk mencari file baru di disk. */
+    this.lastShutterAt = 0;
+    /**
+     * Berkas di folder sesi yang sudah dipakai untuk suatu frame.
+     * Sidik jari isi saja tidak cukup: dua jepretan bisa menghasilkan file
+     * yang identik byte-per-byte (mis. tutup lensa masih terpasang).
+     * @type {Set<string>}
+     */
+    this._consumedFiles = new Set();
   }
 
   static signature(buffer) {
@@ -103,6 +131,27 @@ class DigiCamControlService extends ICameraProvider {
 
     return new Promise((resolve, reject) => {
       const url = new URL(this.baseUrl + suffix);
+      let settled = false;
+
+      const fail = (code, message) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(hardDeadline);
+        const err = new Error(message);
+        err.code = code;
+        try { req.destroy(err); } catch { /* sudah tertutup */ }
+        reject(err);
+      };
+
+      // Opsi `timeout` milik http.get hanya menjaga socket yang benar-benar
+      // diam. Proses yang hang bisa mengirim header lalu menetes byte pelan,
+      // dan request menggantung tanpa batas. Batas keras ini yang menjamin
+      // setiap perintah SELALU selesai.
+      const hardDeadline = setTimeout(
+        () => fail('ETIMEDOUT', 'timeout'),
+        Math.max(1000, timeout) + 1000
+      );
+
       const req = http.get(
         {
           hostname: url.hostname,
@@ -115,23 +164,22 @@ class DigiCamControlService extends ICameraProvider {
         (res) => {
           const chunks = [];
           res.on('data', (c) => chunks.push(c));
-          res.on('end', () =>
+          res.on('end', () => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(hardDeadline);
             resolve({
               status: res.statusCode,
               ok: res.statusCode >= 200 && res.statusCode < 400,
               text: Buffer.concat(chunks).toString('utf-8'),
-            })
-          );
-          res.on('error', reject);
+            });
+          });
+          res.on('error', (err) => fail(err.code || 'ECONNRESET', err.message));
         }
       );
 
-      req.on('timeout', () => {
-        const err = new Error('timeout');
-        err.code = 'ETIMEDOUT';
-        req.destroy(err);
-      });
-      req.on('error', reject);
+      req.on('timeout', () => fail('ETIMEDOUT', 'timeout'));
+      req.on('error', (err) => fail(err.code || 'ECONNRESET', err.message));
     });
   }
 
@@ -184,6 +232,16 @@ class DigiCamControlService extends ICameraProvider {
     }
     this.pending.clear();
     this.frameControllers.clear();
+  }
+
+  /** Jalankan operasi kritis; selama itu frame live view tidak dikirim. */
+  async _withCritical(fn) {
+    this._criticalBusy++;
+    try {
+      return await fn();
+    } finally {
+      this._criticalBusy--;
+    }
   }
 
   _describeError(err) {
@@ -304,7 +362,7 @@ class DigiCamControlService extends ICameraProvider {
    */
   async startLiveView() {
     if (this._startingLiveView) return this._startingLiveView;
-    this._startingLiveView = this._doStartLiveView().finally(() => {
+    this._startingLiveView = this._withCritical(() => this._doStartLiveView()).finally(() => {
       this._startingLiveView = null;
     });
     return this._startingLiveView;
@@ -361,6 +419,7 @@ class DigiCamControlService extends ICameraProvider {
         const frame = await this._fetch(`/liveview.jpg?t=${Date.now()}`, { timeout: 2500, raw: true, kind: 'frame' });
         if (frame.ok && frame.buffer.length > 1024) {
           this.liveViewActive = true;
+          this._frameFailures = 0;
           return { ok: true, connected: true, provider: this.name };
         }
       } catch {
@@ -378,6 +437,9 @@ class DigiCamControlService extends ICameraProvider {
   }
 
   async stopLiveView() {
+    // Sesi berakhir: daftar file terpakai tidak lagi relevan dan tidak boleh
+    // menumpuk pada mesin yang menyala berhari-hari.
+    if (this._consumedFiles.size > 500) this._consumedFiles.clear();
     this.liveViewActive = false;
     this._abortFrames();
     try {
@@ -392,15 +454,41 @@ class DigiCamControlService extends ICameraProvider {
     if (!this.liveViewActive) {
       return { ok: false, code: 'LIVEVIEW_INACTIVE', error: 'Live view belum aktif' };
     }
+    // Beri jalan ke shutter dan pengambilan file. Frame terakhir tetap tampil
+    // di layar, jadi preview hanya membeku sesaat alih-alih foto gagal diambil.
+    if (this._criticalBusy > 0) {
+      return { ok: false, code: 'BUSY' };
+    }
     try {
       const frame = await this._fetch(`/liveview.jpg?t=${Date.now()}`, { timeout: 2500, raw: true, kind: 'frame' });
       if (!frame.ok || frame.buffer.length < 512) {
-        return { ok: false, error: `Frame tidak tersedia (HTTP ${frame.status})` };
+        return this._noteFrameFailure(`Frame tidak tersedia (HTTP ${frame.status})`);
       }
+      this._frameFailures = 0;
       return { ok: true, buffer: frame.buffer, mime: 'image/jpeg' };
     } catch (err) {
-      return { ok: false, error: `Frame gagal diambil (${this._describeError(err)})` };
+      // Pembatalan yang kita picu sendiri (shutter) bukan tanda koneksi putus.
+      if (err && err.name === 'AbortError') return { ok: false, code: 'ABORTED' };
+      return this._noteFrameFailure(`Frame gagal diambil (${this._describeError(err)})`);
     }
+  }
+
+  /**
+   * Frame gagal beberapa kali berturut-turut = live view sudah tidak hidup lagi
+   * (digiCamControl ditutup, crash, atau kamera dicabut). Tandai mati supaya
+   * renderer tahu harus menyambung ulang, bukan menampilkan gambar beku.
+   */
+  _noteFrameFailure(message) {
+    this._frameFailures++;
+    if (this._frameFailures >= 5) {
+      if (this.liveViewActive) {
+        console.warn(`[digiCamControl] Live view terputus setelah ${this._frameFailures} frame gagal — menandai perlu sambung ulang`);
+      }
+      this.liveViewActive = false;
+      this._frameFailures = 0;
+      return { ok: false, code: 'LIVEVIEW_LOST', error: message };
+    }
+    return { ok: false, error: message };
   }
 
   async getLastCaptured() {
@@ -461,6 +549,69 @@ class DigiCamControlService extends ICameraProvider {
   }
 
   /**
+   * Cari foto baru langsung di folder sesi, tanpa HTTP sama sekali.
+   *
+   * digiCamControl menulis hasil jepretan ke folder yang KITA tentukan lewat
+   * `session.folder`. Jadi begitu file ada di disk, foto itu milik kita —
+   * walaupun web server-nya sudah tumbang, di-restart, atau kehilangan
+   * `lastcaptured`. Ini jaring pengaman paling kuat yang kita punya.
+   *
+   * @param {string} dir folder sesi
+   * @param {number} sinceMs abaikan file yang lebih lama dari ini
+   */
+  _findPhotoOnDisk(dir, sinceMs) {
+    if (!dir) return null;
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return null; // folder belum ada
+    }
+
+    let best = null;
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      if (!/.jpe?g$/i.test(entry.name)) continue;
+
+      const filePath = path.join(dir, entry.name);
+      let stat;
+      try {
+        stat = fs.statSync(filePath);
+      } catch {
+        continue;
+      }
+      // Toleransi kecil saja untuk selisih jam file vs jam proses. Terlalu
+      // longgar berbahaya: file frame SEBELUMNYA bisa ikut terpungut.
+      if (stat.mtimeMs < sinceMs - 500) continue;
+      if (stat.size < 1024) continue; // masih ditulis
+      // Sudah dipakai untuk frame lain — jangan diambil dua kali.
+      if (this._consumedFiles.has(filePath)) continue;
+
+      if (!best || stat.mtimeMs > best.mtimeMs) {
+        best = { filePath, name: entry.name, mtimeMs: stat.mtimeMs };
+      }
+    }
+
+    if (!best) return null;
+
+    let buffer;
+    try {
+      buffer = fs.readFileSync(best.filePath);
+    } catch {
+      return null; // sedang ditulis / terkunci
+    }
+
+    // File yang belum selesai ditulis akan gagal di sini dan dicoba lagi
+    // pada iterasi berikutnya.
+    if (!isCompleteJpeg(buffer)) return null;
+
+    // Jangan ambil ulang foto yang sudah kita pakai untuk frame sebelumnya.
+    if (DigiCamControlService.signature(buffer) === this.lastCaptureSignature) return null;
+
+    return { buffer, filename: best.name, filePath: best.filePath };
+  }
+
+  /**
    * Siapkan segalanya SEBELUM momen jepret, dipanggil saat countdown mulai.
    *
    * Semua pekerjaan yang bisa menunda shutter dikerjakan di sini: memastikan
@@ -468,15 +619,35 @@ class DigiCamControlService extends ICameraProvider {
    * fokus. Dengan begitu fireShutter() nanti benar-benar hanya satu request.
    */
   async armCapture() {
+    // Pengambilan file jepretan sebelumnya berjalan di latar belakang. Baseline
+    // baru hanya sahih setelah itu selesai — kalau tidak, lastcaptured masih
+    // menunjuk foto lama dan jepretan ini bisa mengambil foto frame sebelumnya.
+    if (this._activeCollect) {
+      // Dibatasi: armCapture dipanggil saat countdown MULAI, jadi tidak boleh
+      // tersandera pengambilan file yang bermasalah (bisa 20 detik). Kalau
+      // lewat, baseline cadangan dari lastCollectedFilename tetap menyelamatkan.
+      await Promise.race([
+        this._activeCollect.catch(() => { }),
+        delay(3000),
+      ]);
+    }
+    return this._withCritical(() => this._doArmCapture());
+  }
+
+  async _doArmCapture() {
     if (!this.liveViewActive) {
       const lv = await this.startLiveView();
       if (!lv.ok) return { ok: false, code: 'LIVEVIEW_FAILED', error: lv.error };
     }
 
+    // Baseline TIDAK boleh jatuh ke null: dengan null, file apa pun dianggap
+    // "foto baru" oleh collectPhoto — termasuk foto jepretan sebelumnya.
+    // Nama file terakhir yang kita unduh sendiri adalah cadangan yang tepat.
     try {
-      this.armedBaseline = (await this.getLastCaptured()).filename;
+      const res = await this.getLastCaptured();
+      this.armedBaseline = res.filename ?? this.lastCollectedFilename ?? null;
     } catch {
-      this.armedBaseline = null;
+      this.armedBaseline = this.lastCollectedFilename ?? null;
     }
 
     // Fokus dilakukan sekarang, selama user masih menunggu countdown, supaya
@@ -494,7 +665,14 @@ class DigiCamControlService extends ICameraProvider {
    * jatuh tepat di akhir countdown.
    */
   async fireShutter() {
+    return this._withCritical(() => this._doFireShutter());
+  }
+
+  async _doFireShutter() {
     const startedAt = Date.now();
+    // Dicatat SEBELUM perintah dikirim, supaya file apa pun yang muncul di
+    // folder sesi sesudah ini dikenali sebagai hasil jepretan ini.
+    this.lastShutterAt = startedAt;
 
     // Bebaskan antrean /liveview.jpg agar request shutter tidak mengantre.
     // Sengaja HANYA frame: unduhan foto frame sebelumnya bisa saja masih
@@ -561,26 +739,102 @@ class DigiCamControlService extends ICameraProvider {
    * Ambil file hasil jepretan. Dijalankan SETELAH shutter, jadi durasinya tidak
    * lagi menggeser momen foto — hanya menunda tampilnya preview.
    */
-  async collectPhoto({ sessionDir, timeoutMs = 12000, pollIntervalMs = 250 } = {}) {
+  async collectPhoto(options = {}) {
+    const task = this._withCritical(() => this._doCollectPhoto(options));
+    this._activeCollect = task;
+    void task.finally(() => {
+      if (this._activeCollect === task) this._activeCollect = null;
+    });
+    return task;
+  }
+
+  async _doCollectPhoto({ sessionDir, timeoutMs = 12000, pollIntervalMs = 250 } = {}) {
     const targetDir = sessionDir || this.sessionDir;
     const before = this.armedBaseline;
 
     const deadline = Date.now() + timeoutMs;
     let filename = null;
     let wait = 150; // cek pertama lebih cepat; sisanya pakai interval normal
+    // Dicatat supaya saat timeout kita tahu PERSIS apa yang terjadi:
+    // server tidak menjawab, atau menjawab tapi nama filenya tidak pernah berubah.
+    let polls = 0;
+    let answered = 0;
+    let lastSeen = null;
+    let deadStreak = 0;
+    let serverDown = false;
+    let fromDisk = null;
     while (Date.now() < deadline && !this.disposed) {
       await delay(wait);
       wait = pollIntervalMs;
+      polls++;
+
+      // Sumber paling langsung: file di folder sesi milik kita sendiri.
+      // Dicek lebih dulu karena tidak bergantung pada web server sama sekali.
+      fromDisk = this._findPhotoOnDisk(targetDir, this.lastShutterAt);
+      if (fromDisk) break;
+
       const current = await this.getLastCaptured();
+      if (current.filename) {
+        answered++;
+        deadStreak = 0;
+        lastSeen = current.filename;
+      } else if (!current.ok) {
+        // Bukan sekadar "belum ada foto baru" — request-nya sendiri gagal.
+        deadStreak++;
+        // ~3 detik tanpa satu pun jawaban: digiCamControl memang tumbang.
+        // Tidak ada gunanya menghabiskan sisa batas waktu.
+        if (deadStreak >= 10) {
+          serverDown = true;
+          break;
+        }
+      }
       if (current.filename && current.filename !== before) {
         filename = current.filename;
         break;
       }
     }
 
+    // Kesempatan terakhir: digiCamControl bisa saja tumbang SETELAH menulis
+    // filenya. File itu tetap milik kita.
+    if (!filename && !fromDisk) {
+      fromDisk = this._findPhotoOnDisk(targetDir, this.lastShutterAt);
+      if (fromDisk) {
+        console.log('[digiCamControl] Foto diselamatkan langsung dari folder sesi: ' + fromDisk.filename);
+      }
+    }
+
+    if (!filename && !fromDisk) {
+      const diagnosis =
+        serverDown
+          ? `digiCamControl berhenti menjawab setelah ${deadStreak} percobaan beruntun (aplikasi tertutup, crash, atau web server mati)`
+          : answered === 0
+          ? 'digiCamControl tidak menjawab lastcaptured sama sekali (server sibuk atau tidak responsif)'
+          : lastSeen === before
+            ? `lastcaptured tidak pernah berubah dari "${before}" — kamera kemungkinan TIDAK menjepret (shutter ditolak: gagal fokus, mode dial, atau buffer penuh)`
+            : `lastcaptured terbaca "${lastSeen}" tetapi tidak dianggap baru`;
+      console.warn(
+        `[digiCamControl] Foto tidak terdeteksi — ${polls} kali cek, ` +
+        `${answered} dijawab, baseline="${before}". ${diagnosis}`
+      );
+      // Server tumbang di tengah sesi: live view pasti ikut mati.
+      if (serverDown) this.liveViewActive = false;
+    }
+
     let downloaded;
 
-    if (filename) {
+    if (fromDisk) {
+      // Kunci file ini supaya jepretan berikutnya tidak memungutnya lagi.
+      this._consumedFiles.add(fromDisk.filePath);
+      // Sudah ada di disk — tidak perlu mengunduh lewat HTTP sama sekali.
+      downloaded = {
+        ok: true,
+        buffer: fromDisk.buffer,
+        filename: fromDisk.filename,
+        source: 'disk',
+        alreadyOnDisk: fromDisk.filePath,
+      };
+      if (!filename) filename = fromDisk.filename;
+    } else if (filename) {
       downloaded = await this.downloadPhoto(filename, { deadline: Date.now() + 8000 });
     } else {
       // Sebagian konfigurasi kamera (mis. menyimpan hanya ke SD card) tidak
@@ -603,7 +857,9 @@ class DigiCamControlService extends ICameraProvider {
         return {
           ok: false,
           code: 'CAPTURE_TIMEOUT',
-          error: 'Kamera tidak merespon, coba lagi. Pastikan kamera berhasil fokus dan digiCamControl menyimpan foto ke PC (bukan hanya ke SD card).',
+          error:
+            'Kamera tidak menghasilkan foto baru. Cek log aplikasi untuk penyebab pastinya ' +
+            '(shutter ditolak kamera, atau digiCamControl tidak merespons).',
         };
       }
     }
@@ -613,6 +869,8 @@ class DigiCamControlService extends ICameraProvider {
     }
 
     this.lastCaptureSignature = DigiCamControlService.signature(downloaded.buffer);
+    // Jadi baseline untuk jepretan berikutnya, tanpa perlu bertanya ke server.
+    if (filename) this.lastCollectedFilename = filename;
 
     // Kamera menutup live view saat shutter jalan. Nyalakan lagi tanpa menunggu
     // supaya frame berikutnya sudah siap begitu user menekan ULANGI/LANJUT.
@@ -628,12 +886,20 @@ class DigiCamControlService extends ICameraProvider {
       buffer: downloaded.buffer,
     };
 
-    if (targetDir) {
+    if (downloaded.alreadyOnDisk) {
+      // File aslinya sudah ditulis digiCamControl di folder sesi.
+      result.filePath = downloaded.alreadyOnDisk;
+    } else if (targetDir) {
       try {
         fs.mkdirSync(targetDir, { recursive: true });
         const filePath = path.join(targetDir, result.filename);
         fs.writeFileSync(filePath, downloaded.buffer);
         result.filePath = filePath;
+        // Tandai juga file yang kita tulis sendiri. Tanpa ini, foto yang
+        // diambil lewat HTTP tidak terkunci, dan pencarian disk pada jepretan
+        // berikutnya bisa memungutnya lagi bila penulisannya kebetulan selesai
+        // sesudah shutter berikutnya.
+        this._consumedFiles.add(filePath);
       } catch (err) {
         // Foto sudah di tangan; kegagalan salin lokal tidak boleh membatalkan sesi.
         result.saveWarning = `Foto berhasil diambil tetapi gagal disalin ke folder sesi: ${err.message}`;

@@ -251,7 +251,67 @@ class CameraProviderManager {
 
     this.currentSessionDir = dir;
     const res = await this.provider.setSessionFolder(dir);
+
+    // Jangan sampai disk penuh diam-diam (lihat pruneOldSessions).
+    this.pruneOldSessions();
+
     return { ok: true, sessionActive: true, sessionDir: dir, folderSet: res.ok, warning: res.error };
+  }
+
+  /**
+   * Buang folder sesi lama.
+   *
+   * Setiap sesi menyimpan JPEG resolusi penuh dari kamera (Large ~7 MB,
+   * Medium ~3 MB) dikali jumlah frame. Pada mesin photobooth yang ramai itu
+   * bisa berarti beberapa GB per hari, dan tidak ada apa pun yang membersihkan
+   * folder-folder itu — disk akan penuh dalam hitungan minggu, lalu capture
+   * mulai gagal karena digiCamControl tidak bisa menulis file.
+   *
+   * Foto yang sudah jadi tetap aman: hasil akhirnya sudah diunggah ke server
+   * dan disalin lewat backup lokal. Folder ini hanya arsip mentah sementara.
+   */
+  pruneOldSessions({ keepDays = 7, keepMax = 200 } = {}) {
+    let entries;
+    try {
+      entries = fs.readdirSync(this.sessionRoot, { withFileTypes: true });
+    } catch {
+      return { removed: 0 }; // folder belum ada
+    }
+
+    const folders = [];
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const full = path.join(this.sessionRoot, entry.name);
+      try {
+        folders.push({ full, mtimeMs: fs.statSync(full).mtimeMs });
+      } catch {
+        /* lewati yang tidak terbaca */
+      }
+    }
+
+    folders.sort((a, b) => b.mtimeMs - a.mtimeMs); // terbaru dulu
+
+    const cutoff = Date.now() - keepDays * 24 * 60 * 60 * 1000;
+    let removed = 0;
+
+    folders.forEach((folder, index) => {
+      // Sesi yang sedang berjalan tidak pernah disentuh.
+      if (folder.full === this.currentSessionDir) return;
+      const tooOld = folder.mtimeMs < cutoff;
+      const tooMany = index >= keepMax;
+      if (!tooOld && !tooMany) return;
+      try {
+        fs.rmSync(folder.full, { recursive: true, force: true });
+        removed++;
+      } catch (err) {
+        console.warn('[Camera] Gagal menghapus folder sesi lama:', err.message);
+      }
+    });
+
+    if (removed > 0) {
+      console.log(`[Camera] ${removed} folder sesi lama dibersihkan (simpan ${keepDays} hari / ${keepMax} sesi terakhir)`);
+    }
+    return { removed, total: folders.length };
   }
 
   async startLiveView() {

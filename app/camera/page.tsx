@@ -1547,7 +1547,7 @@ function CameraContent() {
 
                   <span className="text-[10px] font-black uppercase tracking-widest">
 
-                    {liveViewState === "error" ? "Kamera tidak terhubung" : "Menyiapkan kamera..."}
+                    {liveViewState === "error" ? "Kamera tidak terhubung" : liveViewState === "reconnecting" ? "Menyambungkan ulang kamera..." : "Menyiapkan kamera..."}
 
                   </span>
 
@@ -1591,6 +1591,15 @@ function CameraContent() {
 
               {/* Flash Overlay */}
               {flashActive && <div className="absolute inset-0 bg-white z-50 animate-out fade-out duration-300"></div>}
+
+              {/* digiCamControl terputus/crash — aplikasi menyambung ulang sendiri.
+                  Frame terakhir tetap tampil, jadi cukup badge kecil. */}
+              {!usesWebcam && liveViewState === "reconnecting" && !showPreview && (
+                <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 bg-amber-500/90 px-3 py-1.5 rounded-full">
+                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-white font-black text-[9px] uppercase tracking-widest">Menyambungkan ulang kamera</span>
+                </div>
+              )}
 
               {/* Indikator refiningFrames dihapus agar proses berjalan senyap (invisible) bagi customer */}
 

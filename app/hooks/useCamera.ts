@@ -53,7 +53,8 @@ interface CameraBridge {
   collectPhoto: () => Promise<{ ok: boolean; dataUrl?: string; filePath?: string; error?: string }>;
   getShutterCommand: () => Promise<string>;
   setShutterCommand: (value: string) => Promise<{ ok: boolean; value: string }>;
-  getFrame: () => Promise<{ ok: boolean; data?: Uint8Array; mime?: string; error?: string }>;
+  /** code: 'BUSY' (operasi kritis jalan), 'ABORTED', 'LIVEVIEW_LOST', 'LIVEVIEW_INACTIVE' */
+  getFrame: () => Promise<{ ok: boolean; data?: Uint8Array; mime?: string; error?: string; code?: string }>;
   getLastCaptured: () => Promise<{ ok: boolean; filename: string | null }>;
   downloadPhoto: (filename: string) => Promise<{ ok: boolean; dataUrl?: string; error?: string }>;
   getProvider: () => Promise<CameraProvider>;
@@ -78,7 +79,7 @@ export function useCamera(options: UseCameraOptions = {}) {
   const [providerReady, setProviderReady] = useState(false);
   const [connected, setConnected] = useState(false);
   const [liveViewUrl, setLiveViewUrl] = useState<string | null>(null);
-  const [liveViewState, setLiveViewState] = useState<"idle" | "starting" | "running" | "error">("idle");
+  const [liveViewState, setLiveViewState] = useState<"idle" | "starting" | "running" | "reconnecting" | "error">("idle");
   const [isCapturing, setIsCapturing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,6 +93,12 @@ export function useCamera(options: UseCameraOptions = {}) {
   });
   /** Live view sudah pernah dimulai — syarat sebelum frame loop boleh di-resume. */
   const liveViewStartedRef = useRef(false);
+  /** Referensi ke startLiveView, dipakai frame loop untuk menyambung ulang sendiri. */
+  const startLiveViewRef = useRef<(() => Promise<unknown>) | null>(null);
+  /** Sedang menyambung ulang — cegah percobaan bertumpuk. */
+  const reconnectingRef = useRef(false);
+  /** Percobaan sambung ulang beruntun, untuk backoff. */
+  const reconnectAttemptsRef = useRef(0);
 
   const setFrame = useCallback((bytes: Uint8Array, mime: string) => {
     const blob = new Blob([new Uint8Array(bytes)], { type: mime || "image/jpeg" });
@@ -217,10 +224,43 @@ export function useCamera(options: UseCameraOptions = {}) {
       try {
         const res = await bridge.getFrame();
         if (state.cancelled) return;
+
         if (res?.ok && res.data) {
           setFrame(res.data, res.mime || "image/jpeg");
           setLiveViewState("running");
+          reconnectAttemptsRef.current = 0;
+        } else if (
+          // LIVEVIEW_LOST hanya dikirim SEKALI (saat live view baru ketahuan
+          // putus). Sesudah itu service menjawab LIVEVIEW_INACTIVE terus, jadi
+          // kode itu juga harus memicu percobaan berikutnya — kalau tidak,
+          // satu percobaan gagal berarti preview beku selamanya.
+          (res?.code === "LIVEVIEW_LOST" || res?.code === "LIVEVIEW_INACTIVE") &&
+          // Hanya kalau live view memang pernah hidup. Sebelum itu, halaman
+          // yang bertanggung jawab memulainya.
+          liveViewStartedRef.current &&
+          !reconnectingRef.current
+        ) {
+          // digiCamControl tertutup, crash, atau kamera dicabut. Sambung ulang
+          // sendiri — tanpa ini preview membeku sampai user keluar halaman.
+          reconnectingRef.current = true;
+          setLiveViewState("reconnecting");
+
+          const attempt = ++reconnectAttemptsRef.current;
+          // Backoff bertahap supaya tidak membanjiri server yang sedang bangkit.
+          const backoff = Math.min(5000, 500 * attempt);
+
+          setTimeout(() => {
+            const restart = startLiveViewRef.current;
+            if (!restart || state.cancelled) {
+              reconnectingRef.current = false;
+              return;
+            }
+            void Promise.resolve(restart()).finally(() => {
+              reconnectingRef.current = false;
+            });
+          }, backoff);
         }
+        // code 'BUSY' dan 'ABORTED' adalah kondisi normal — abaikan diam-diam.
       } catch {
         /* frame gagal sesekali bukan alasan menghentikan preview */
       }
@@ -260,9 +300,13 @@ export function useCamera(options: UseCameraOptions = {}) {
     setConnected(true);
     setError(null);
     liveViewStartedRef.current = true;
+    reconnectAttemptsRef.current = 0;
     startFrameLoop();
     return res;
   }, [activeProvider, startFrameLoop, stopFrameLoop]);
+
+  // Frame loop memanggilnya lewat ref supaya tidak ada ketergantungan melingkar.
+  startLiveViewRef.current = startLiveView;
 
   /**
    * Hentikan sementara polling frame tanpa mematikan live view di kamera.
@@ -336,7 +380,11 @@ export function useCamera(options: UseCameraOptions = {}) {
     setError(null);
     try {
       const res = await bridge.collectPhoto();
-      if (!res?.ok) setError(res?.error || "Foto gagal diambil dari kamera");
+      // Sengaja TIDAK memasang error global di sini. Halaman kamera sudah
+      // memasang preview sementara dari frame live view, jadi memunculkan
+      // banner merah hanya membuat panik padahal sesi tetap berjalan.
+      // Pemanggil yang memutuskan apakah kegagalan ini perlu ditampilkan.
+      if (!res?.ok) console.warn("[useCamera] collectPhoto gagal:", res?.error);
       return res;
     } catch (e) {
       const message = (e as Error).message;
