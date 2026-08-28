@@ -42,6 +42,13 @@ export default function SettingsPage() {
 
   // Camera provider states
   const [cameraProvider, setCameraProvider] = useState<CameraProvider>("webcam");
+  /**
+   * Tab setelan yang sedang dibuka user — sengaja TERPISAH dari provider yang
+   * benar-benar aktif. Tanpa pemisahan ini, provider yang gagal health check
+   * langsung di-rollback dan panel setelannya tidak pernah muncul, sehingga
+   * user tidak punya cara memperbaiki penyebab kegagalannya.
+   */
+  const [providerTab, setProviderTab] = useState<CameraProvider>("webcam");
   const [providerStatus, setProviderStatus] = useState<{ connected: boolean; error?: string; detail?: string } | null>(null);
   const [providerBusy, setProviderBusy] = useState(false);
   const [imageQuality, setImageQuality] = useState<string>("");
@@ -154,7 +161,7 @@ export default function SettingsPage() {
     if (!api) return;
     try {
       const name = await api.getProvider();
-      if (name) setCameraProvider(name);
+      if (name) { setCameraProvider(name); setProviderTab(name); }
     } catch {
       /* biarkan default */
     }
@@ -297,7 +304,17 @@ export default function SettingsPage() {
       showToast("Pergantian sumber kamera hanya tersedia di aplikasi desktop", "error");
       return;
     }
-    if (name === cameraProvider || providerBusy) return;
+    if (providerBusy) return;
+
+    // Pindahkan tab LEBIH DULU supaya panel setelannya langsung terbuka,
+    // walaupun pengaktifannya nanti gagal. Di situlah user memperbaiki
+    // penyebab kegagalan — mis. mengisi folder simpan EOS Utility.
+    setProviderTab(name);
+
+    if (name === cameraProvider) {
+      await refreshProviderStatus();
+      return;
+    }
 
     setProviderBusy(true);
     try {
@@ -403,7 +420,7 @@ export default function SettingsPage() {
     const cam = getCameraBridge();
     if (cam?.onProviderChanged) {
       cam.onProviderChanged((status: CameraStatus) => {
-        if (status?.provider) setCameraProvider(status.provider);
+        if (status?.provider) { setCameraProvider(status.provider); setProviderTab(status.provider); }
         setProviderStatus({ connected: !!status?.connected, error: status?.error });
       });
     }
@@ -802,18 +819,37 @@ export default function SettingsPage() {
                           onClick={() => handleSelectProvider(opt.id)}
                           disabled={providerBusy}
                           className={`px-3 py-2 rounded-xl border-2 text-left transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
-                            cameraProvider === opt.id
+                            providerTab === opt.id
                               ? "border-violet-500 bg-violet-50 shadow-sm"
                               : "border-slate-200 bg-slate-50 hover:border-slate-300"
                           }`}
                         >
-                          <span className={`block text-[10px] font-black ${cameraProvider === opt.id ? "text-violet-700" : "text-slate-600"}`}>
+                          <span className={`block text-[10px] font-black ${providerTab === opt.id ? "text-violet-700" : "text-slate-600"}`}>
                             {opt.label}
                           </span>
                           <span className="block text-[9px] text-slate-400">{opt.sub}</span>
                         </button>
                       ))}
                     </div>
+
+                    {/* Tab yang dibuka belum tentu provider yang aktif — mis. saat
+                        setelannya belum lengkap. Katakan apa adanya. */}
+                    {providerTab !== cameraProvider && (
+                      <div className="mt-2 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2">
+                        <p className="text-[9px] text-amber-800 font-bold leading-relaxed">
+                          Belum aktif. Yang sedang dipakai:{" "}
+                          <strong>
+                            {cameraProvider === "webcam"
+                              ? "Webcam Utility"
+                              : cameraProvider === "digicamcontrol"
+                                ? "DigiCamControl"
+                                : "EOS Utility"}
+                          </strong>
+                          . Lengkapi pengaturan di bawah, lalu tekan tombolnya sekali
+                          lagi untuk mengaktifkan.
+                        </p>
+                      </div>
+                    )}
 
                     {providerStatus?.detail && !providerStatus.error && (
                       <p className="text-[9px] text-slate-400 mt-2 break-words">{providerStatus.detail}</p>
@@ -825,7 +861,7 @@ export default function SettingsPage() {
                       </div>
                     )}
 
-                    {cameraProvider !== "webcam" && (
+                    {providerTab !== "webcam" && (
                       <div className="mt-2">
                         <label className="block text-[10px] font-bold text-slate-700 mb-1">Sumber Preview Layar</label>
                         <p className="text-[9px] text-slate-400 mb-1.5">
@@ -856,7 +892,7 @@ export default function SettingsPage() {
                       </div>
                     )}
 
-                    {cameraProvider === "eosutility" && (
+                    {providerTab === "eosutility" && (
                       <div className="mt-2 space-y-2">
                         <div>
                           <label className="block text-[10px] font-bold text-slate-700 mb-1">Folder Simpan EOS Utility</label>
@@ -921,7 +957,7 @@ export default function SettingsPage() {
                       </div>
                     )}
 
-                    {cameraProvider === "digicamcontrol" && (
+                    {providerTab === "digicamcontrol" && (
                       <div className="mt-2">
                         <label className="block text-[10px] font-bold text-slate-700 mb-1">Mode Shutter</label>
                         <p className="text-[9px] text-slate-400 mb-1.5">
@@ -945,7 +981,7 @@ export default function SettingsPage() {
                       </div>
                     )}
 
-                    {cameraProvider === "digicamcontrol" && (
+                    {providerTab === "digicamcontrol" && (
                       <div className="mt-2">
                         <label className="block text-[10px] font-bold text-slate-700 mb-1">Ukuran Foto Kamera</label>
                         <p className="text-[9px] text-slate-400 mb-1.5">
