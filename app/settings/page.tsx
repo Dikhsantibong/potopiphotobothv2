@@ -6,6 +6,23 @@ import localforage from "localforage";
 import dynamic from "next/dynamic";
 import "react-simple-keyboard/build/css/index.css";
 import { getCameraBridge, type CameraProvider, type CameraStatus } from "../hooks/useCamera";
+import { applyBrandColor, DEFAULT_BRAND, BRAND_STORAGE_KEY } from "../components/ThemeColor";
+
+// Palet warna siap pakai untuk tema aplikasi (biar tidak perlu set manual).
+const BRAND_PRESETS: { name: string; color: string }[] = [
+  { name: "Potopi Orange", color: "#f15a09" },
+  { name: "Merah", color: "#e11d48" },
+  { name: "Pink", color: "#db2777" },
+  { name: "Ungu", color: "#7c3aed" },
+  { name: "Indigo", color: "#4f46e5" },
+  { name: "Biru", color: "#2563eb" },
+  { name: "Cyan", color: "#0891b2" },
+  { name: "Teal", color: "#0d9488" },
+  { name: "Hijau", color: "#16a34a" },
+  { name: "Amber", color: "#d97706" },
+  { name: "Cokelat", color: "#92400e" },
+  { name: "Slate", color: "#334155" },
+];
 
 const Keyboard = dynamic(() => import("react-simple-keyboard"), { ssr: false });
 
@@ -39,6 +56,7 @@ export default function SettingsPage() {
   });
   const [sessionTimeout, setSessionTimeout] = useState<number>(300);
   const [countdownDuration, setCountdownDuration] = useState<number>(3);
+  const [brandColor, setBrandColor] = useState<string>(DEFAULT_BRAND);
 
   // Camera provider states
   const [cameraProvider, setCameraProvider] = useState<CameraProvider>("webcam");
@@ -69,6 +87,9 @@ export default function SettingsPage() {
       setSessionTimeout(parseInt(input) || 0);
     } else if (focusedInput === "countdownDuration") {
       setCountdownDuration(parseInt(input) || 0);
+    } else if (focusedInput === "brandColor") {
+      setBrandColor(input);
+      if (/^#?[0-9a-fA-F]{6}$/.test(input)) handleSelectBrandColor(input);
     } else if (focusedInput) {
       handleChange(focusedInput, input);
     }
@@ -301,6 +322,11 @@ export default function SettingsPage() {
 
       const savedCountdown = localStorage.getItem("countdownDuration");
       if (savedCountdown) setCountdownDuration(parseInt(savedCountdown, 10));
+
+      const savedBrand = localStorage.getItem(BRAND_STORAGE_KEY);
+      if (savedBrand && /^#?[0-9a-fA-F]{6}$/.test(savedBrand)) {
+        setBrandColor(savedBrand.startsWith("#") ? savedBrand : `#${savedBrand}`);
+      }
     } catch (e) {
       console.error("Error fetching hardware:", e);
     }
@@ -416,6 +442,28 @@ export default function SettingsPage() {
     localStorage.setItem("sessionTimeout", sessionTimeout.toString());
     localStorage.setItem("countdownDuration", Math.min(10, Math.max(1, countdownDuration)).toString());
     showToast("Pengaturan Hardware & Fitur disimpan!", "success");
+  };
+
+  // Warna diterapkan seketika (preview langsung) sekaligus disimpan, agar
+  // tampilan brand berubah di semua halaman tanpa perlu tombol simpan terpisah.
+  const handleSelectBrandColor = (color: string) => {
+    const clean = /^#?[0-9a-fA-F]{6}$/.test(color)
+      ? (color.startsWith("#") ? color : `#${color}`)
+      : DEFAULT_BRAND;
+    setBrandColor(clean);
+    applyBrandColor(clean);
+    try {
+      localStorage.setItem(BRAND_STORAGE_KEY, clean);
+    } catch { /* abaikan */ }
+  };
+
+  const handleResetBrandColor = () => {
+    setBrandColor(DEFAULT_BRAND);
+    applyBrandColor(DEFAULT_BRAND);
+    try {
+      localStorage.removeItem(BRAND_STORAGE_KEY);
+    } catch { /* abaikan */ }
+    showToast("Warna tema dikembalikan ke default", "success");
   };
 
   const handleBack = () => {
@@ -665,6 +713,94 @@ export default function SettingsPage() {
               >
                 {saving ? "Menyimpan..." : "Simpan Config Server"}
               </button>
+            </section>
+
+            {/* Section: Warna Tema */}
+            <section className="space-y-3">
+              <div className="flex items-center gap-3 mb-2 px-2">
+                <div className="w-6 h-6 rounded-lg bg-pink-100 text-pink-600 flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.555C21.965 6.012 17.461 2 12 2z"/></svg>
+                </div>
+                <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest">Warna Tema</h2>
+              </div>
+
+              <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-3">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="min-w-0">
+                    <label className="block text-[10px] font-bold text-slate-700">Warna Brand Aplikasi</label>
+                    <p className="text-[9px] text-slate-400 mt-0.5">Berlaku di seluruh halaman (tombol, aksen, border). Pilih palet atau atur manual.</p>
+                  </div>
+                  <div
+                    className="w-10 h-10 rounded-xl border-2 border-slate-200 shrink-0 shadow-inner"
+                    style={{ backgroundColor: brandColor }}
+                    aria-label="Pratinjau warna"
+                  />
+                </div>
+
+                {/* Palet warna siap pakai */}
+                <div className="grid grid-cols-6 gap-2 mb-3">
+                  {BRAND_PRESETS.map((preset) => {
+                    const active = brandColor.toLowerCase() === preset.color.toLowerCase();
+                    return (
+                      <button
+                        key={preset.color}
+                        onClick={() => handleSelectBrandColor(preset.color)}
+                        title={preset.name}
+                        className={`relative aspect-square rounded-xl transition-all ${
+                          active ? "ring-4 ring-offset-2 ring-slate-300 scale-105 shadow-lg" : "hover:scale-105 shadow-sm"
+                        }`}
+                        style={{ backgroundColor: preset.color }}
+                      >
+                        {active && (
+                          <span className="absolute inset-0 flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Custom warna manual */}
+                <div className="flex items-center gap-2">
+                  <label className="relative shrink-0 cursor-pointer" title="Pilih warna custom">
+                    <span
+                      className="block w-10 h-10 rounded-xl border-2 border-slate-200 shadow-inner"
+                      style={{ backgroundColor: brandColor }}
+                    />
+                    <input
+                      type="color"
+                      value={/^#[0-9a-fA-F]{6}$/.test(brandColor) ? brandColor : DEFAULT_BRAND}
+                      onChange={(e) => handleSelectBrandColor(e.target.value)}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                  </label>
+                  <input
+                    type="text"
+                    value={brandColor}
+                    onFocus={() => onInputFocus("brandColor", brandColor)}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setBrandColor(v);
+                      if (keyboardRef.current && focusedInput === "brandColor") {
+                        keyboardRef.current.setInput(v);
+                      }
+                      if (/^#?[0-9a-fA-F]{6}$/.test(v)) handleSelectBrandColor(v);
+                    }}
+                    placeholder="#f15a09"
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-mono text-slate-700 focus:outline-none focus:ring-2 focus:ring-pink-400/40 focus:border-pink-400 transition-all"
+                  />
+                  <button
+                    onClick={handleResetBrandColor}
+                    className="shrink-0 px-3 py-2 rounded-xl bg-slate-100 text-slate-600 font-bold text-[9px] uppercase tracking-widest hover:bg-slate-200 transition-colors"
+                  >
+                    Reset
+                  </button>
+                </div>
+                <p className="text-[9px] text-slate-400 italic mt-2">
+                  Perubahan warna langsung tersimpan &amp; diterapkan otomatis.
+                </p>
+              </div>
             </section>
           </div>
 

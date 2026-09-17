@@ -870,11 +870,11 @@ function PrintContent() {
                              <polyline points="12 6 12 12 16 14"></polyline>
                           </svg>
                           <span className="text-white text-xs font-black uppercase tracking-widest leading-snug drop-shadow-md">
-                             PROSES UPLOAD FILE<br/>TERKENDALA JARINGAN
+                             (PROSES UPLOAD<br/>TERKENDALA)
                           </span>
                           <div className="mt-3 bg-black/25 backdrop-blur-sm px-3 py-2 rounded-xl border border-white/20 shadow-inner w-full max-w-[90%] mx-auto">
                              <span className="text-white text-[9px] font-bold tracking-wider leading-relaxed block">
-                                Hubungi staf untuk ambil file Anda
+                                Hubungi Instagram @potopi.id untuk mendapatkan file Anda
                              </span>
                           </div>
                         </div>

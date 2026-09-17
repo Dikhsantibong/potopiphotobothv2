@@ -3,6 +3,10 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  /* Warna brand aplikasi. Bisa di-override runtime dari halaman Settings
+     (disimpan di localStorage sebagai `brandColor`) melalui ThemeColor. */
+  --brand: #f15a09;
+  --brand-hover: #d94e08;
 }
 
 @theme inline {
@@ -24,3 +28,32 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }
+
+/* ── Override warna brand ──────────────────────────────────────────────
+   Semua halaman memakai warna brand literal `#f15a09` lewat util Tailwind
+   (bg/text/border-[#f15a09], dst). Aturan di bawah memetakan tiap util itu
+   ke `var(--brand)`, sehingga ganti warna cukup dengan mengubah `--brand`
+   di elemen <html> (dilakukan ThemeColor dari nilai localStorage). Selama
+   `--brand` = #f15a09, tampilan identik dengan aslinya.
+
+   Selector memakai bentuk atribut [class~="..."] alih-alih menuliskan ulang
+   kelas ber-escape (.bg-\[\#f15a09\]) — nama kelas ada di dalam string ber-
+   tanda kutip sehingga aman diparse (tidak dianggap attribute-selector `[]`),
+   dan bobot spesifisitasnya sama dengan util Tailwind. Ditaruh setelah
+   @import "tailwindcss" + !important agar konsisten menang cascade. */
+[class~="text-[#f15a09]"] { color: var(--brand) !important; }
+[class~="bg-[#f15a09]"] { background-color: var(--brand) !important; }
+[class~="border-[#f15a09]"] { border-color: var(--brand) !important; }
+[class~="ring-[#f15a09]"] { --tw-ring-color: var(--brand) !important; }
+[class~="border-[#f15a09]/20"] { border-color: color-mix(in oklab, var(--brand) 20%, transparent) !important; }
+[class~="bg-[#f15a09]/80"] { background-color: color-mix(in oklab, var(--brand) 80%, transparent) !important; }
+[class~="bg-[#f15a09]/15"] { background-color: color-mix(in oklab, var(--brand) 15%, transparent) !important; }
+[class~="bg-[#f15a09]/10"] { background-color: color-mix(in oklab, var(--brand) 10%, transparent) !important; }
+[class~="text-[#f15a09]/30"] { color: color-mix(in oklab, var(--brand) 30%, transparent) !important; }
+[class~="ring-[#f15a09]/20"] { --tw-ring-color: color-mix(in oklab, var(--brand) 20%, transparent) !important; }
+[class~="hover:text-[#f15a09]"]:hover { color: var(--brand) !important; }
+[class~="hover:border-[#f15a09]"]:hover { border-color: var(--brand) !important; }
+[class~="hover:bg-[#f15a09]/20"]:hover { background-color: color-mix(in oklab, var(--brand) 20%, transparent) !important; }
+[class~="hover:bg-[#d94e08]"]:hover { background-color: var(--brand-hover) !important; }
+[class~="focus:ring-[#f15a09]/20"]:focus { --tw-ring-color: color-mix(in oklab, var(--brand) 20%, transparent) !important; }
+[class~="focus:border-[#f15a09]"]:focus { border-color: var(--brand) !important; }

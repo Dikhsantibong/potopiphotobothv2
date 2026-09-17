@@ -184,6 +184,10 @@ function CameraContent() {
 
   const [showWarning, setShowWarning] = useState(false);
 
+  // Detik terakhir kali peringatan waktu muncul, agar pemicu setiap 10 detik
+  // tidak dobel walaupun timer sempat berjalan tidak persis 1 detik.
+  const lastWarnSecRef = useRef<number>(-1);
+
   const [showTimeoutAlert, setShowTimeoutAlert] = useState(false);
 
 
@@ -268,13 +272,25 @@ function CameraContent() {
 
       }
 
-      if (remaining === 60 && !showWarning) { setShowWarning(true); setTimeout(() => setShowWarning(false), 5000); }
+      // Peringatan waktu mulai muncul saat sisa 2 menit, lalu diulang setiap
+      // 10 detik. Tampil sebentar (4 detik) supaya customer terus diingatkan
+      // tanpa merasa terganggu.
+
+      if (remaining <= 120 && remaining > 0 && remaining % 10 === 0 && lastWarnSecRef.current !== remaining) {
+
+        lastWarnSecRef.current = remaining;
+
+        setShowWarning(true);
+
+        setTimeout(() => setShowWarning(false), 4000);
+
+      }
 
     }, 1000);
 
     return () => clearInterval(timer);
 
-  }, [router, showWarning, canvasType]);
+  }, [router, canvasType]);
 
 
 
@@ -2015,7 +2031,7 @@ function CameraContent() {
 
         <div className="fixed top-28 left-1/2 -translate-x-1/2 z-50 bg-white text-[#f15a09] px-12 py-6 rounded-full shadow-[0_0_50px_rgba(241,90,9,0.3)] border-4 border-[#f15a09] animate-bounce">
 
-          <span className={`${mochiyPopOne.className} text-2xl uppercase`}>Sisa 1 Menit!</span>
+          <span className={`${mochiyPopOne.className} text-2xl uppercase`}>Sisa Waktu {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
 
         </div>
 

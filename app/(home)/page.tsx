@@ -242,11 +242,11 @@ export default function Home() {
               onClick={handleCloseBanner}
               className="mt-6 flex items-center gap-2 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-md px-8 py-3 text-white font-bold text-sm uppercase tracking-[0.15em] border border-white/30 shadow-lg transition-all duration-200 active:scale-95"
             >
+              LANJUT FOTO
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
               </svg>
-              TUTUP
             </button>
           </div>
         </div>
