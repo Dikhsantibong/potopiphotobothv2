@@ -10,6 +10,11 @@ const mochiyPopOne = Mochiy_Pop_One({
   weight: "400",
 });
 
+// Fitur CORETAN & STIKER disembunyikan sementara. Seluruh logikanya tetap utuh
+// (canvas coretan tetap dirender karena dibutuhkan handleFinish) — ubah ke
+// `true` untuk menampilkan kembali panel ALAT EDIT dan footer lama.
+const SHOW_EDIT_TOOLS = false;
+
 function RenderContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -652,6 +657,22 @@ function RenderContent() {
 
   const colors = ["#ffffff", "#000000", "#ff3b30", "#ff9500", "#ffd60a", "#34c759", "#007aff", "#5856d6", "#ff2d55"];
 
+  const handleRetakeAll = () => {
+    const storedTemplatesJSON = localStorage.getItem(`templates_${canvasType}`);
+    let frameCount = 4;
+    if (storedTemplatesJSON) {
+      const tpls = JSON.parse(storedTemplatesJSON);
+      const t = tpls.find((x: any) => x.id.toString() === templateId);
+      if (t) frameCount = t.frame_count;
+    }
+    router.push(`/camera?kanvas=${canvasType}&template=${templateId}&frames=${frameCount}&time=${timeLeft}`);
+  };
+
+  const handleFinishClick = () => {
+    setLoadingProgress(0);
+    handleFinish();
+  };
+
   return (
     <div
       className="relative h-screen w-full overflow-hidden bg-[#f15a09] font-sans text-slate-900 flex flex-col p-2 sm:p-3"
@@ -666,7 +687,7 @@ function RenderContent() {
         
         <header className="relative z-10 flex items-center justify-between px-5 py-2 shrink-0">
           <h2 className={`${mochiyPopOne.className} text-white text-base sm:text-lg uppercase tracking-widest drop-shadow-md`}>
-            PERSONALISASI
+            {SHOW_EDIT_TOOLS ? "PERSONALISASI" : "HASIL FOTO"}
           </h2>
 
           <div className="flex items-center gap-2 bg-white/20 backdrop-blur-xl px-4 py-1.5 rounded-full border border-white/40 shadow-lg">
@@ -681,17 +702,19 @@ function RenderContent() {
 
           <div className="flex-1 flex flex-row gap-4 min-h-0 overflow-hidden">
 
-            <div className="flex-[1.65] flex flex-col min-h-0 min-w-0 gap-2">
+            <div className={`${SHOW_EDIT_TOOLS ? "flex-[1.65]" : "flex-1"} flex flex-col min-h-0 min-w-0 gap-2`}>
 
-              <h2 className={`${mochiyPopOne.className} text-white text-sm uppercase tracking-widest text-center shrink-0 drop-shadow-md`}>
-                HASIL FOTO
-              </h2>
+              {SHOW_EDIT_TOOLS && (
+                <h2 className={`${mochiyPopOne.className} text-white text-sm uppercase tracking-widest text-center shrink-0 drop-shadow-md`}>
+                  HASIL FOTO
+                </h2>
+              )}
 
           <div className="flex-1 min-h-0 bg-white rounded-[20px] shadow-2xl relative overflow-hidden border-3 border-white flex flex-col">
-            
-            <div 
+
+            <div
               ref={containerRef}
-              className="flex-1 flex items-center justify-center p-4 overflow-hidden select-none relative"
+              className={`flex-1 flex items-center justify-center ${SHOW_EDIT_TOOLS ? "p-4" : "p-2"} overflow-hidden select-none relative`}
               onMouseDown={(e) => { if (activeMode === "draw") startDrawing(e); else if (e.target === e.currentTarget) setSelectedStickerId(null); }}
               onTouchStart={(e) => { if (activeMode === "draw") startDrawing(e); else if (e.target === e.currentTarget) setSelectedStickerId(null); }}
             >
@@ -752,6 +775,7 @@ function RenderContent() {
 
 
 
+            {SHOW_EDIT_TOOLS ? (
             <div className="flex-1 flex flex-col min-h-0 min-w-0 gap-2">
 
               <h2 className={`${mochiyPopOne.className} text-white text-sm uppercase tracking-widest text-center shrink-0 drop-shadow-md`}>
@@ -839,39 +863,56 @@ function RenderContent() {
           </div>
 
             </div>
+            ) : (
+            /* Panel tombol besar — menggantikan ALAT EDIT selama fitur edit disembunyikan */
+            <div className="w-[28%] min-w-[220px] max-w-[340px] shrink-0 flex flex-col justify-center gap-4 min-h-0">
+              <button
+                id="btn-finish"
+                onClick={handleFinishClick}
+                disabled={isRenderingVideo}
+                className="flex-1 max-h-[65%] min-h-[180px] w-full rounded-[28px] bg-white text-[#f15a09] shadow-2xl border-4 border-white flex flex-col items-center justify-center gap-4 px-4 transition-transform hover:scale-[1.02] active:scale-[0.97] disabled:pointer-events-none disabled:opacity-70 select-none"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
+                <span className={`${mochiyPopOne.className} text-3xl lg:text-4xl uppercase leading-none`}>
+                  {isRenderingVideo ? "MEMPROSES..." : "CETAK"}
+                </span>
+                <span className="text-[11px] font-black uppercase tracking-widest text-slate-400 text-center">
+                  Lanjut ke cetak &amp; unduh foto
+                </span>
+              </button>
+
+              <button
+                onClick={handleRetakeAll}
+                disabled={isRenderingVideo}
+                className="w-full rounded-2xl border-[3px] border-white py-4 text-sm font-black uppercase tracking-widest text-white transition-colors hover:bg-white/10 active:scale-[0.98] disabled:opacity-50"
+              >
+                FOTO ULANG
+              </button>
+            </div>
+            )}
 
           </div>
 
         </main>
 
+        {SHOW_EDIT_TOOLS && (
         <footer className="shrink-0 flex items-center justify-center gap-3 px-6 py-3">
            <button
-             onClick={() => {
-               const storedTemplatesJSON = localStorage.getItem(`templates_${canvasType}`);
-               let frameCount = 4;
-               if (storedTemplatesJSON) {
-                 const tpls = JSON.parse(storedTemplatesJSON);
-                 const t = tpls.find((x: any) => x.id.toString() === templateId);
-                 if (t) frameCount = t.frame_count;
-               }
-               router.push(`/camera?kanvas=${canvasType}&template=${templateId}&frames=${frameCount}&time=${timeLeft}`);
-             }}
+             onClick={handleRetakeAll}
              className="rounded-full border-2 border-white px-6 py-2.5 text-xs font-black uppercase tracking-widest text-white transition-colors hover:bg-white/10"
            >
              FOTO ULANG
            </button>
            <button
              id="btn-finish"
-             onClick={() => {
-               setLoadingProgress(0);
-               handleFinish();
-             }}
+             onClick={handleFinishClick}
              disabled={isRenderingVideo}
              className="rounded-full bg-white px-10 py-2.5 text-sm font-black uppercase tracking-widest text-[#f15a09] shadow-xl transition-transform hover:scale-[1.03] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-70 select-none"
            >
              {isRenderingVideo ? "SEDANG MERENDER..." : "LANJUT CETAK"}
            </button>
         </footer>
+        )}
       </div>
 
       {showWarning && (
