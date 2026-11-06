@@ -7,6 +7,7 @@ import dynamic from "next/dynamic";
 import "react-simple-keyboard/build/css/index.css";
 import { getCameraBridge, type CameraProvider, type CameraStatus } from "../hooks/useCamera";
 import { applyBrandColor, DEFAULT_BRAND, BRAND_STORAGE_KEY } from "../components/ThemeColor";
+import { applyDisplayLayout, readDisplayLayout, DISPLAY_LAYOUT_KEY, type DisplayLayoutMode } from "../components/DisplayLayout";
 
 // Palet warna siap pakai untuk tema aplikasi (biar tidak perlu set manual).
 const BRAND_PRESETS: { name: string; color: string }[] = [
@@ -57,6 +58,7 @@ export default function SettingsPage() {
   const [sessionTimeout, setSessionTimeout] = useState<number>(300);
   const [countdownDuration, setCountdownDuration] = useState<number>(3);
   const [brandColor, setBrandColor] = useState<string>(DEFAULT_BRAND);
+  const [displayLayout, setDisplayLayout] = useState<DisplayLayoutMode>("landscape");
 
   // Camera provider states
   const [cameraProvider, setCameraProvider] = useState<CameraProvider>("webcam");
@@ -323,6 +325,8 @@ export default function SettingsPage() {
       const savedCountdown = localStorage.getItem("countdownDuration");
       if (savedCountdown) setCountdownDuration(parseInt(savedCountdown, 10));
 
+      setDisplayLayout(readDisplayLayout());
+
       const savedBrand = localStorage.getItem(BRAND_STORAGE_KEY);
       if (savedBrand && /^#?[0-9a-fA-F]{6}$/.test(savedBrand)) {
         setBrandColor(savedBrand.startsWith("#") ? savedBrand : `#${savedBrand}`);
@@ -464,6 +468,16 @@ export default function SettingsPage() {
       localStorage.removeItem(BRAND_STORAGE_KEY);
     } catch { /* abaikan */ }
     showToast("Warna tema dikembalikan ke default", "success");
+  };
+
+  // Mode tampilan diterapkan seketika ke seluruh aplikasi dan langsung disimpan.
+  const handleSelectDisplayLayout = (mode: DisplayLayoutMode) => {
+    setDisplayLayout(mode);
+    applyDisplayLayout(mode);
+    try {
+      localStorage.setItem(DISPLAY_LAYOUT_KEY, mode);
+    } catch { /* abaikan */ }
+    showToast(mode === "portrait" ? "Mode tampilan: Portrait (layar tegak)" : "Mode tampilan: Landscape (layar mendatar)", "success");
   };
 
   const handleBack = () => {
@@ -713,6 +727,56 @@ export default function SettingsPage() {
               >
                 {saving ? "Menyimpan..." : "Simpan Config Server"}
               </button>
+            </section>
+
+            {/* Section: Mode Tampilan */}
+            <section className="space-y-3">
+              <div className="flex items-center gap-3 mb-2 px-2">
+                <div className="w-6 h-6 rounded-lg bg-sky-100 text-sky-600 flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/></svg>
+                </div>
+                <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest">Mode Tampilan</h2>
+              </div>
+
+              <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-3">
+                <label className="block text-[10px] font-bold text-slate-700">Orientasi Layar Mesin</label>
+                <p className="text-[9px] text-slate-400 mt-0.5 mb-2">
+                  Pilih sesuai posisi monitor. Portrait menata ulang halaman kamera, hasil foto, dan cetak untuk layar tegak — preview kamera tetap berbentuk landscape agar rasio gambar customer normal.
+                </p>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    { id: "landscape" as DisplayLayoutMode, label: "Landscape", sub: "Layar mendatar (default)" },
+                    { id: "portrait" as DisplayLayoutMode, label: "Portrait", sub: "Layar tegak" },
+                  ]).map((opt) => {
+                    const active = displayLayout === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        onClick={() => handleSelectDisplayLayout(opt.id)}
+                        className={`px-3 py-2.5 rounded-xl border-2 flex items-center gap-3 text-left transition-all ${
+                          active ? "border-sky-500 bg-sky-50 shadow-sm" : "border-slate-200 bg-slate-50 hover:border-slate-300"
+                        }`}
+                      >
+                        <span className={`shrink-0 flex items-center justify-center w-8 h-8 ${active ? "text-sky-600" : "text-slate-400"}`}>
+                          {opt.id === "landscape" ? (
+                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="13" x="2" y="5.5" rx="2"/></svg>
+                          ) : (
+                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="13" height="20" x="5.5" y="2" rx="2"/></svg>
+                          )}
+                        </span>
+                        <span className="min-w-0">
+                          <span className={`block text-[10px] font-black ${active ? "text-sky-700" : "text-slate-600"}`}>{opt.label}</span>
+                          <span className="block text-[9px] text-slate-400">{opt.sub}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[9px] text-slate-400 italic mt-2">
+                  Perubahan langsung tersimpan &amp; diterapkan ke semua halaman.
+                </p>
+              </div>
             </section>
 
             {/* Section: Warna Tema */}

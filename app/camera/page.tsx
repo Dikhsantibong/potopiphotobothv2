@@ -1485,15 +1485,17 @@ function CameraContent() {
 
 
 
-        <main className="flex-1 flex flex-col gap-3 px-4 pb-4 min-h-0 overflow-hidden">
+        <main className="flex-1 flex flex-col gap-3 px-4 pb-4 min-h-0 overflow-hidden potret:grid potret:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] potret:grid-rows-[auto_minmax(0,1fr)]">
 
-          {/* Landscape top: camera + preview side by side */}
+          {/* Landscape top: camera + preview side by side.
+              Portrait: kamera (rasio landscape) selebar layar di atas; di bawahnya
+              preview template | panel filter berdampingan (grid pada <main>). */}
 
-          <div className="flex-1 flex flex-row gap-4 min-h-0 overflow-hidden">
+          <div className="flex-1 flex flex-row gap-4 min-h-0 overflow-hidden potret:contents">
 
             {/* Left: SESI POTRET */}
 
-            <div className="flex-[1.65] flex flex-col min-h-0 min-w-0 gap-2">
+            <div className="flex-[1.65] flex flex-col min-h-0 min-w-0 gap-2 potret:col-span-2">
 
               <h2 className={`${mochiyPopOne.className} text-white text-base sm:text-lg uppercase tracking-widest text-center shrink-0 drop-shadow-md`}>
 
@@ -1503,7 +1505,11 @@ function CameraContent() {
 
 
 
-          <div className="flex-1 min-h-0 bg-white rounded-[20px] shadow-2xl overflow-hidden relative border-3 border-white">
+          {/* Portrait: box kamera dikunci ke rasio asli sumbernya (webcam 16:9,
+              DSLR digiCamControl 3:2) selebar layar, supaya tampilan customer
+              tetap landscape normal & sama dengan hasil jepretan. max-w adalah
+              pengaman agar tinggi box tidak lebih dari separuh layar. */}
+          <div className={`flex-1 min-h-0 bg-white rounded-[20px] shadow-2xl overflow-hidden relative border-3 border-white potret:flex-none potret:w-full potret:self-center ${usesWebcam ? "potret:aspect-video potret:max-w-[calc(50vh*16/9)]" : "potret:aspect-[3/2] potret:max-w-[calc(50vh*3/2)]"}`}>
 
             {/* Video/Photo Layer */}
 
@@ -1755,21 +1761,25 @@ function CameraContent() {
 
 
 
-            <div className="flex-1 min-h-0 bg-white rounded-[20px] shadow-2xl p-3 flex items-center justify-center relative overflow-hidden border-3 border-white">
+            <div className="flex-1 min-h-0 bg-white rounded-[20px] shadow-2xl p-3 flex items-center justify-center relative overflow-hidden border-3 border-white potret:[container-type:size]">
 
             {template ? (
 
               <div
 
-                className="relative shadow-lg overflow-hidden bg-slate-50 border-2 border-slate-100"
+                // Portrait: ukuran dihitung "contain" terhadap box (lebar & tinggi),
+                // bukan hanya tinggi, agar template tidak terpotong di layar tegak.
+                className="relative shadow-lg overflow-hidden bg-slate-50 border-2 border-slate-100 potret:h-auto! potret:w-[min(100cqw,calc(100cqh*var(--tpl-ar)))]!"
 
                 style={{
 
                   height: '100%',
 
-                  aspectRatio: `${template.image_width}/${template.image_height}`
+                  aspectRatio: `${template.image_width}/${template.image_height}`,
 
-                }}
+                  "--tpl-ar": template.image_width / template.image_height,
+
+                } as React.CSSProperties}
 
               >
 
@@ -1929,13 +1939,13 @@ function CameraContent() {
 
           {/* Bottom control bar (landscape) */}
 
-          <div className="shrink-0 bg-white rounded-[20px] shadow-xl px-5 py-3 flex flex-row items-center gap-6 border-3 border-white">
+          <div className="shrink-0 bg-white rounded-[20px] shadow-xl px-5 py-3 flex flex-row items-center gap-6 border-3 border-white potret:mt-9 potret:flex-col potret:items-stretch potret:justify-center potret:gap-12 potret:p-6">
 
-              <div className="flex flex-col gap-1.5 shrink-0">
+              <div className="flex flex-col gap-1.5 shrink-0 potret:gap-4">
 
-                <span className={`${mochiyPopOne.className} text-[#f15a09] text-[10px] uppercase`}>FILTER</span>
+                <span className={`${mochiyPopOne.className} text-[#f15a09] text-[10px] uppercase potret:text-sm`}>FILTER</span>
 
-                <div className="flex flex-row gap-2">
+                <div className="flex flex-row gap-2 potret:grid potret:grid-cols-3 potret:gap-5 potret:justify-items-center">
 
                   {filters.map(f => (
 
@@ -1945,7 +1955,7 @@ function CameraContent() {
 
                       onClick={() => updateEdit("activeFilter", f.id)}
 
-                      className={`w-9 h-9 shrink-0 rounded-full ${f.color} border-3 transition-all relative
+                      className={`w-9 h-9 shrink-0 rounded-full ${f.color} border-3 transition-all relative potret:w-20 potret:h-20
 
                             ${currentEdit.activeFilter === f.id
 
@@ -1979,15 +1989,15 @@ function CameraContent() {
 
 
 
-              <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+              <div className="flex-1 flex flex-col gap-1.5 min-w-0 potret:flex-none potret:gap-4">
 
-                <span className={`${mochiyPopOne.className} text-[#f15a09] text-[10px] uppercase`}>SESUAIKAN</span>
+                <span className={`${mochiyPopOne.className} text-[#f15a09] text-[10px] uppercase potret:text-sm`}>SESUAIKAN</span>
 
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2 potret:gap-6">
 
                   <div className="flex items-center gap-3">
 
-                    <span className="text-[9px] font-black text-[#f15a09] uppercase w-24 shrink-0">pencahayaan</span>
+                    <span className="text-[9px] font-black text-[#f15a09] uppercase w-24 shrink-0 potret:text-xs">pencahayaan</span>
 
                     <input
 
@@ -1995,7 +2005,7 @@ function CameraContent() {
 
                       onChange={(e) => updateEdit("brightness", Number(e.target.value))}
 
-                      className="flex-1 h-1.5 bg-slate-200 rounded-full appearance-none cursor-pointer accent-black"
+                      className="flex-1 h-1.5 bg-slate-200 rounded-full appearance-none cursor-pointer accent-black potret:h-3"
 
                     />
 
@@ -2003,7 +2013,7 @@ function CameraContent() {
 
                   <div className="flex items-center gap-3">
 
-                    <span className="text-[9px] font-black text-[#f15a09] uppercase w-24 shrink-0">kontras</span>
+                    <span className="text-[9px] font-black text-[#f15a09] uppercase w-24 shrink-0 potret:text-xs">kontras</span>
 
                     <input
 
@@ -2011,7 +2021,7 @@ function CameraContent() {
 
                       onChange={(e) => updateEdit("contrast", Number(e.target.value))}
 
-                      className="flex-1 h-1.5 bg-slate-200 rounded-full appearance-none cursor-pointer accent-black"
+                      className="flex-1 h-1.5 bg-slate-200 rounded-full appearance-none cursor-pointer accent-black potret:h-3"
 
                     />
 

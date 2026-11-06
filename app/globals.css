@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* Varian `potret:` — hanya aktif saat mode tampilan Portrait dipilih di
+   Settings (DisplayLayout menyetel <html data-layout="portrait">). Di mode
+   Landscape atribut itu tidak ada, sehingga semua kelas `potret:` tidak
+   berlaku dan tampilan landscape tetap persis seperti semula. */
+@custom-variant potret (&:where([data-layout="portrait"] *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

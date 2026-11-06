@@ -1048,14 +1048,14 @@ function FlipbookRenderContent() {
           <div className="flex-1 min-h-0 bg-white rounded-[20px] shadow-2xl relative overflow-hidden border-3 border-white flex flex-col">
             <div 
               ref={containerRef}
-              className="flex-1 flex items-center justify-center p-4 overflow-hidden select-none relative min-h-0 w-full"
+              className="flex-1 flex items-center justify-center p-4 overflow-hidden select-none relative min-h-0 w-full potret:[container-type:size]"
               onMouseDown={(e) => { if (activeMode === "draw") startDrawing(e); else if (e.target === e.currentTarget) setSelectedStickerId(null); }}
               onTouchStart={(e) => { if (activeMode === "draw") startDrawing(e); else if (e.target === e.currentTarget) setSelectedStickerId(null); }}
             >
                <div
                  ref={previewRef}
-                 className="relative shadow-2xl rounded-lg overflow-hidden shrink-0 bg-slate-100 h-full max-w-full"
-                 style={{ aspectRatio: `${dim.w} / ${dim.h}` }}
+                 className="relative shadow-2xl rounded-lg overflow-hidden shrink-0 bg-slate-100 h-full max-w-full potret:h-auto! potret:w-[min(100cqw,calc(100cqh*var(--tpl-ar)))]!"
+                 style={{ aspectRatio: `${dim.w} / ${dim.h}`, "--tpl-ar": dim.w / dim.h } as React.CSSProperties}
                >
                   
                   {/* Base Rendered Image or Video Preview */}

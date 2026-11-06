@@ -1001,7 +1001,7 @@ function FlipbookPrintContent() {
 
         <main className="flex-1 flex flex-col gap-3 px-4 pb-3 min-h-0 overflow-hidden items-stretch">
 
-          <div className="flex-1 flex flex-row gap-4 min-h-0 overflow-hidden">
+          <div className="flex-1 flex flex-row gap-4 min-h-0 overflow-hidden potret:flex-col potret:gap-3">
 
             <div className="flex-[1.65] flex flex-col min-h-0 min-w-0 gap-2">
 
@@ -1032,7 +1032,7 @@ function FlipbookPrintContent() {
                 </div>
               ) : (
                 /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={finalCover} alt="Final Cover" className="h-full object-contain select-none animate-in fade-in duration-500" draggable={false} />
+                <img src={finalCover} alt="Final Cover" className="h-full object-contain select-none animate-in fade-in duration-500 potret:w-full" draggable={false} />
               )}
             </div>
 
@@ -1085,15 +1085,15 @@ function FlipbookPrintContent() {
 
 
 
-            <div className="flex-1 flex flex-col min-h-0 min-w-0 gap-2">
+            <div className="flex-1 flex flex-col min-h-0 min-w-0 gap-2 potret:flex-none">
 
               <h2 className={`${mochiyPopOne.className} text-white text-sm uppercase tracking-widest text-center shrink-0 drop-shadow-md`}>
                 UNDUH & CETAK
               </h2>
 
-          <div className="flex-1 min-h-0 bg-white rounded-[20px] shadow-2xl flex flex-col items-center p-4 overflow-y-auto border-3 border-white">
+          <div className="flex-1 min-h-0 bg-white rounded-[20px] shadow-2xl flex flex-col items-center p-4 overflow-y-auto border-3 border-white potret:flex-none potret:flex-row potret:justify-center potret:items-stretch potret:gap-2">
 
-             <div className="shrink-0 flex flex-col items-center text-center w-full max-w-[300px] mx-auto">
+             <div className="shrink-0 flex flex-col items-center text-center w-full max-w-[300px] mx-auto potret:mx-0 potret:justify-center">
                 <h3 className={`${mochiyPopOne.className} text-slate-900 text-sm uppercase leading-relaxed mb-1`}>SCAN QR CODE</h3>
                 <h3 className={`${mochiyPopOne.className} text-[#f15a09] text-[10px] uppercase mb-4 tracking-tighter`}>DOWNLOAD SOFTFILE</h3>
 
@@ -1130,7 +1130,7 @@ function FlipbookPrintContent() {
             </div>
              </div>
 
-             <div className="flex-1 flex flex-col items-center justify-center border-t-4 border-slate-50 pt-4 mt-4 gap-3 w-full max-w-[300px] mx-auto min-h-0">
+             <div className="flex-1 flex flex-col items-center justify-center border-t-4 border-slate-50 pt-4 mt-4 gap-3 w-full max-w-[300px] mx-auto min-h-0 potret:flex-none potret:border-t-0 potret:border-l-4 potret:pt-0 potret:mt-0 potret:pl-8 potret:mx-0 potret:max-w-[340px]">
                 {isPrintSheetsReady && (
                   <div className="grid grid-cols-2 gap-3 mb-2 w-full shrink-0">
                     <div className="bg-orange-50 rounded-2xl p-3 text-center border-2 border-orange-100">

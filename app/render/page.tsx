@@ -700,7 +700,8 @@ function RenderContent() {
 
         <main className="flex-1 flex flex-col gap-3 px-4 pb-3 min-h-0 overflow-hidden">
 
-          <div className="flex-1 flex flex-row gap-4 min-h-0 overflow-hidden">
+          {/* Portrait: foto di atas (mengisi layar), tombol di bawah. */}
+          <div className="flex-1 flex flex-row gap-4 min-h-0 overflow-hidden potret:flex-col potret:gap-3">
 
             <div className={`${SHOW_EDIT_TOOLS ? "flex-[1.65]" : "flex-1"} flex flex-col min-h-0 min-w-0 gap-2`}>
 
@@ -714,11 +715,12 @@ function RenderContent() {
 
             <div
               ref={containerRef}
-              className={`flex-1 flex items-center justify-center ${SHOW_EDIT_TOOLS ? "p-4" : "p-2"} overflow-hidden select-none relative`}
+              className={`flex-1 flex items-center justify-center ${SHOW_EDIT_TOOLS ? "p-4" : "p-2"} overflow-hidden select-none relative potret:[container-type:size]`}
               onMouseDown={(e) => { if (activeMode === "draw") startDrawing(e); else if (e.target === e.currentTarget) setSelectedStickerId(null); }}
               onTouchStart={(e) => { if (activeMode === "draw") startDrawing(e); else if (e.target === e.currentTarget) setSelectedStickerId(null); }}
             >
-               <div className="relative shadow-2xl rounded-lg overflow-hidden shrink-0 bg-white" style={{ height: '100%', aspectRatio: `${dim.w} / ${dim.h}` }}>
+               {/* Portrait: ukuran "contain" terhadap lebar & tinggi box agar hasil foto tidak terpotong. */}
+               <div className="relative shadow-2xl rounded-lg overflow-hidden shrink-0 bg-white potret:h-auto! potret:w-[min(100cqw,calc(100cqh*var(--tpl-ar)))]!" style={{ height: '100%', aspectRatio: `${dim.w} / ${dim.h}`, "--tpl-ar": dim.w / dim.h } as React.CSSProperties}>
                   <img src={baseImage} alt="Base" className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none" draggable={false} />
                   
                   {/* STICKER LAYER */}
@@ -776,7 +778,7 @@ function RenderContent() {
 
 
             {SHOW_EDIT_TOOLS ? (
-            <div className="flex-1 flex flex-col min-h-0 min-w-0 gap-2">
+            <div className="flex-1 flex flex-col min-h-0 min-w-0 gap-2 potret:flex-none potret:h-[34%]">
 
               <h2 className={`${mochiyPopOne.className} text-white text-sm uppercase tracking-widest text-center shrink-0 drop-shadow-md`}>
                 ALAT EDIT
@@ -865,12 +867,13 @@ function RenderContent() {
             </div>
             ) : (
             /* Panel tombol besar — menggantikan ALAT EDIT selama fitur edit disembunyikan */
-            <div className="w-[28%] min-w-[220px] max-w-[340px] shrink-0 flex flex-col justify-center gap-4 min-h-0">
+            /* Portrait: panel mendatar di bawah foto — CETAK besar + FOTO ULANG berdampingan. */
+            <div className="w-[28%] min-w-[220px] max-w-[340px] shrink-0 flex flex-col justify-center gap-4 min-h-0 potret:w-full potret:min-w-0 potret:max-w-none potret:h-[clamp(170px,14vh,260px)] potret:flex-row potret:items-stretch">
               <button
                 id="btn-finish"
                 onClick={handleFinishClick}
                 disabled={isRenderingVideo}
-                className="flex-1 max-h-[65%] min-h-[180px] w-full rounded-[28px] bg-white text-[#f15a09] shadow-2xl border-4 border-white flex flex-col items-center justify-center gap-4 px-4 transition-transform hover:scale-[1.02] active:scale-[0.97] disabled:pointer-events-none disabled:opacity-70 select-none"
+                className="flex-1 max-h-[65%] min-h-[180px] w-full rounded-[28px] bg-white text-[#f15a09] shadow-2xl border-4 border-white flex flex-col items-center justify-center gap-4 px-4 transition-transform hover:scale-[1.02] active:scale-[0.97] disabled:pointer-events-none disabled:opacity-70 select-none potret:flex-[2] potret:max-h-none potret:min-h-0 potret:gap-3"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
                 <span className={`${mochiyPopOne.className} text-3xl lg:text-4xl uppercase leading-none`}>
@@ -884,7 +887,7 @@ function RenderContent() {
               <button
                 onClick={handleRetakeAll}
                 disabled={isRenderingVideo}
-                className="w-full rounded-2xl border-[3px] border-white py-4 text-sm font-black uppercase tracking-widest text-white transition-colors hover:bg-white/10 active:scale-[0.98] disabled:opacity-50"
+                className="w-full rounded-2xl border-[3px] border-white py-4 text-sm font-black uppercase tracking-widest text-white transition-colors hover:bg-white/10 active:scale-[0.98] disabled:opacity-50 potret:flex-1 potret:w-auto potret:rounded-[28px] potret:text-base"
               >
                 FOTO ULANG
               </button>

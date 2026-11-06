@@ -780,7 +780,7 @@ function PrintContent() {
 
         <main className="flex-1 flex flex-col gap-3 px-4 pb-3 min-h-0 overflow-hidden">
 
-          <div className="flex-1 flex flex-row gap-4 min-h-0 overflow-hidden">
+          <div className="flex-1 flex flex-row gap-4 min-h-0 overflow-hidden potret:flex-col potret:gap-3">
 
             <div className="flex-[1.65] flex flex-col min-h-0 min-w-0 gap-2">
 
@@ -791,13 +791,13 @@ function PrintContent() {
           <div className="flex-1 min-h-0 bg-white rounded-[20px] shadow-2xl flex flex-col p-3 overflow-hidden border-3 border-white relative">
              <div className="flex-1 flex items-center justify-center overflow-hidden bg-slate-50 rounded-[1.5rem] relative shadow-inner min-h-0">
                  {previewMode === "photo" ? (
-                    <img src={finalImage} alt="Final" className="h-full object-contain select-none animate-in fade-in duration-500" />
+                    <img src={finalImage} alt="Final" className="h-full object-contain select-none animate-in fade-in duration-500 potret:w-full" />
                  ) : previewMode === "gif" && gifUrl ? (
-                    <video src={gifUrl} autoPlay loop muted playsInline className="h-full object-contain select-none animate-in fade-in duration-500" />
+                    <video src={gifUrl} autoPlay loop muted playsInline className="h-full object-contain select-none animate-in fade-in duration-500 potret:w-full" />
                  ) : previewMode === "gif" && rawPhotos.length > 0 ? (
                     // Fallback selama ffmpeg masih merakit GIF: slideshow foto frame
-                    <div className="relative h-full flex items-center justify-center">
-                       <img src={rawPhotos[currentGifIndex]} alt="GIF Preview" className="h-full object-contain select-none" />
+                    <div className="relative h-full flex items-center justify-center potret:w-full">
+                       <img src={rawPhotos[currentGifIndex]} alt="GIF Preview" className="h-full object-contain select-none potret:w-full" />
                        {gifState === "building" && (
                           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-slate-900/70 text-white text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full">
                              Membuat GIF...
@@ -810,7 +810,7 @@ function PrintContent() {
                        <span className="text-[10px] font-black uppercase tracking-widest">Membuat GIF...</span>
                     </div>
                  ) : finalVideoUrl ? (
-                    <video src={finalVideoUrl} autoPlay loop muted className="h-full object-contain select-none animate-in fade-in duration-500" />
+                    <video src={finalVideoUrl} autoPlay loop muted className="h-full object-contain select-none animate-in fade-in duration-500 potret:w-full" />
                  ) : (
                     <div className="flex flex-col items-center text-slate-300 gap-2">
                        <div className="w-10 h-10 border-4 border-slate-100 border-t-slate-300 rounded-full animate-spin"></div>
@@ -845,15 +845,15 @@ function PrintContent() {
 
 
 
-            <div className="flex-1 flex flex-col min-h-0 min-w-0 gap-2">
+            <div className="flex-1 flex flex-col min-h-0 min-w-0 gap-2 potret:flex-none">
 
               <h2 className={`${mochiyPopOne.className} text-white text-sm uppercase tracking-widest text-center shrink-0 drop-shadow-md`}>
                 UNDUH & CETAK
               </h2>
 
-          <div className="flex-1 min-h-0 bg-white rounded-[20px] shadow-2xl flex flex-col items-center p-4 overflow-y-auto border-3 border-white">
+          <div className="flex-1 min-h-0 bg-white rounded-[20px] shadow-2xl flex flex-col items-center p-4 overflow-y-auto border-3 border-white potret:flex-none potret:flex-row potret:justify-center potret:items-stretch potret:gap-2">
              
-             <div className="shrink-0 flex flex-col items-center text-center w-full max-w-[300px] mx-auto">
+             <div className="shrink-0 flex flex-col items-center text-center w-full max-w-[300px] mx-auto potret:mx-0 potret:justify-center">
                  <h3 className={`${mochiyPopOne.className} text-slate-900 text-sm uppercase leading-relaxed mb-1`}>SCAN QR CODE</h3>
                  <h3 className={`${mochiyPopOne.className} text-[#f15a09] text-[10px] uppercase mb-4 tracking-tighter`}>DOWNLOAD SOFTFILE</h3>
 
@@ -901,7 +901,7 @@ function PrintContent() {
 
              </div>
 
-             <div className="flex-1 flex flex-col items-center justify-center border-t-4 border-slate-50 pt-4 mt-4 gap-3 w-full max-w-[300px] mx-auto min-h-0">
+             <div className="flex-1 flex flex-col items-center justify-center border-t-4 border-slate-50 pt-4 mt-4 gap-3 w-full max-w-[300px] mx-auto min-h-0 potret:flex-none potret:border-t-0 potret:border-l-4 potret:pt-0 potret:mt-0 potret:pl-8 potret:mx-0 potret:max-w-[340px]">
                 {/* Print Quantity Selector */}
                 <div className="flex flex-col items-center mb-2 w-full">
                   <p className={`${mochiyPopOne.className} text-[10px] text-slate-400 mb-3 uppercase tracking-widest`}>JUMLAH CETAK</p>

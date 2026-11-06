@@ -958,15 +958,15 @@ function FlipbookCameraContent() {
 
         <main className="flex-1 flex flex-col gap-3 px-4 pb-4 min-h-0 overflow-hidden">
 
-          <div className="flex-1 flex flex-row gap-4 min-h-0 overflow-hidden">
+          <div className="flex-1 flex flex-row gap-4 min-h-0 overflow-hidden potret:flex-col potret:gap-3">
 
-            <div className="flex-[1.65] flex flex-col min-h-0 min-w-0 gap-2">
+            <div className="flex-[1.65] flex flex-col min-h-0 min-w-0 gap-2 potret:flex-none">
 
               <h2 className={`${mochiyPopOne.className} text-white text-base sm:text-lg uppercase tracking-widest text-center shrink-0 drop-shadow-md`}>SESI POTRET</h2>
 
 
 
-          <div className="flex-1 min-h-0 bg-white rounded-[20px] shadow-2xl overflow-hidden relative border-3 border-white">
+          <div className="flex-1 min-h-0 bg-white rounded-[20px] shadow-2xl overflow-hidden relative border-3 border-white potret:flex-none potret:w-full potret:self-center potret:aspect-video potret:max-w-[calc(50vh*16/9)]">
 
               <div className="absolute inset-0 bg-slate-900 overflow-hidden">
 

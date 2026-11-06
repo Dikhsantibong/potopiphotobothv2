@@ -14,6 +14,7 @@ const geistMono = Geist_Mono({
 
 import BackgroundUploader from "./components/BackgroundUploader";
 import ThemeColor from "./components/ThemeColor";
+import DisplayLayout from "./components/DisplayLayout";
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -32,6 +33,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <ThemeColor />
+        <DisplayLayout />
         {children}
         <BackgroundUploader />
       </body>
